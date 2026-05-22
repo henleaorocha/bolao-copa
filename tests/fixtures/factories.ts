@@ -91,4 +91,50 @@ export async function createTestPrediction(
   return data
 }
 
+export async function createTestLeague(
+  name: string,
+  accessType: 'open' | 'private',
+  createdBy: string | null = null
+) {
+  const admin = adminClient()
+  const { data, error } = await admin
+    .from('leagues')
+    .insert({ name, access_type: accessType, created_by: createdBy })
+    .select('id, name, access_type, member_count, created_by, invite_token')
+    .single()
+  if (error) throw new Error(`createTestLeague: ${error.message}`)
+  return data
+}
+
+export async function deleteTestLeague(leagueId: string) {
+  const admin = adminClient()
+  await admin.from('leagues').delete().eq('id', leagueId)
+}
+
+export async function addTestLeagueMember(
+  leagueId: string,
+  userId: string,
+  role: 'admin' | 'member' = 'member'
+) {
+  const admin = adminClient()
+  const { data, error } = await admin
+    .from('league_members')
+    .insert({ league_id: leagueId, user_id: userId, role })
+    .select()
+    .single()
+  if (error) throw new Error(`addTestLeagueMember: ${error.message}`)
+  return data
+}
+
+export function authedClient(accessToken: string) {
+  return createClient(
+    SUPABASE_URL,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      global: { headers: { Authorization: `Bearer ${accessToken}` } },
+      auth: { autoRefreshToken: false, persistSession: false },
+    }
+  )
+}
+
 export { DEFAULT_LEAGUE_ID }
