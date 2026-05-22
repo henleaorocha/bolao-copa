@@ -50,6 +50,19 @@ export async function proxy(request: NextRequest) {
   const ehPaginaPublica = PAGINAS_PUBLICAS.some((rota) => pathname === rota)
 
   if (!user) {
+    // For unauthenticated /join requests, preserve the original URL in a cookie
+    if (pathname === '/join') {
+      const urlOriginal = request.nextUrl.toString()
+      const urlLogin = new URL('/login', request.url)
+      response = NextResponse.redirect(urlLogin)
+      response.cookies.set('x-invite-redirect', urlOriginal, {
+        httpOnly: false,
+        maxAge: 60 * 60,
+        path: '/',
+      })
+      return response
+    }
+
     if (ehRotaApi && !ehApiPublica) {
       // APIs protegidas: retornar JSON 401 — nunca redirecionar para HTML
       return Response.json(
