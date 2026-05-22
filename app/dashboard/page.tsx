@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import Image from 'next/image'
 import { getSupabaseServerClient } from '@/lib/supabase/client'
+import { ensureUserSynced } from '@/lib/user-sync'
 import LogoutButton from '@/components/LogoutButton'
 
 const DEFAULT_LEAGUE_ID = '00000000-0000-0000-0000-000000000001'
@@ -15,6 +16,10 @@ export default async function DashboardPage() {
   if (!user) {
     redirect('/login')
   }
+
+  // Garante que o usuário existe em public.users e league_members
+  // (necessário se autenticou antes das migrations serem aplicadas)
+  await ensureUserSynced(supabase, user)
 
   const [userResult, memberResult, leagueResult] = await Promise.all([
     supabase
@@ -36,6 +41,12 @@ export default async function DashboardPage() {
   ])
 
   if (userResult.error || memberResult.error || leagueResult.error) {
+    const failedQuery = userResult.error
+      ? `users: ${userResult.error.message}`
+      : memberResult.error
+        ? `league_members: ${memberResult.error.message}`
+        : `leagues: ${leagueResult.error!.message}`
+    console.error('[dashboard] Query falhou:', failedQuery)
     throw new Error('Erro ao carregar dados do usuário')
   }
 

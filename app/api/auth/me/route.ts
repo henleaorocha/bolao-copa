@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseServerClient } from '@/lib/supabase/client'
 import { formatSuccess, formatError } from '@/lib/api/responses'
+import { ensureUserSynced } from '@/lib/user-sync'
 
 const DEFAULT_LEAGUE_ID = '00000000-0000-0000-0000-000000000001'
 
@@ -32,6 +33,8 @@ export async function GET(request: NextRequest) {
         { status: 401 }
       )
     }
+
+    await ensureUserSynced(supabase, user)
 
     const [userResult, memberResult, leagueResult] = await Promise.all([
       supabase
