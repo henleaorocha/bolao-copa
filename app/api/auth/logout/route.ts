@@ -4,7 +4,6 @@ import { formatSuccess, formatError } from '@/lib/api/responses'
 
 const ALLOWED_ORIGINS = [
   process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000',
-  'https://bolao-copa.vercel.app',
 ]
 
 export async function POST(request: NextRequest) {
