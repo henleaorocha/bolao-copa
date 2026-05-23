@@ -2,9 +2,8 @@ import { redirect } from 'next/navigation'
 import Image from 'next/image'
 import { getSupabaseServerClient } from '@/lib/supabase/client'
 import { ensureUserSynced } from '@/lib/user-sync'
+import { resolveActiveLeague } from '@/lib/resolve-active-league'
 import LogoutButton from '@/components/LogoutButton'
-
-const DEFAULT_LEAGUE_ID = '00000000-0000-0000-0000-000000000001'
 
 export default async function DashboardPage() {
   const supabase = await getSupabaseServerClient()
@@ -21,6 +20,13 @@ export default async function DashboardPage() {
   // (necessário se autenticou antes das migrations serem aplicadas)
   await ensureUserSynced(supabase, user)
 
+  // Resolve the user's active league dynamically
+  const activeLeagueId = await resolveActiveLeague(supabase, user.id)
+
+  if (!activeLeagueId) {
+    throw new Error('Usuário não tem nenhuma liga')
+  }
+
   const [userResult, memberResult, leagueResult] = await Promise.all([
     supabase
       .from('users')
@@ -31,12 +37,12 @@ export default async function DashboardPage() {
       .from('league_members')
       .select('role')
       .eq('user_id', user.id)
-      .eq('league_id', DEFAULT_LEAGUE_ID)
+      .eq('league_id', activeLeagueId)
       .single(),
     supabase
       .from('leagues')
       .select('id, name, access_type, logo_url')
-      .eq('id', DEFAULT_LEAGUE_ID)
+      .eq('id', activeLeagueId)
       .single(),
   ])
 

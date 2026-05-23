@@ -31,7 +31,32 @@ export interface LeagueContext {
   role: 'member' | 'admin'
 }
 
+export interface LeagueSummary {
+  id: string
+  name: string
+  access_type: 'open' | 'private'
+  logo_url: string | null
+  role: 'admin' | 'member'
+  member_count: number
+}
+
+export interface LeagueMember {
+  user_id: string
+  full_name: string | null
+  avatar_url: string | null
+  avatar_color: string
+  role: 'admin' | 'member'
+  joined_at: string
+}
+
+export interface LeagueDetail extends LeagueSummary {
+  description: string | null
+  created_by: string
+  created_at: string
+  members: LeagueMember[]
+}
+
 export interface AuthMeResponse {
   user: AuthUser
-  league: LeagueContext
+  league: LeagueSummary
 }

@@ -1,0 +1,609 @@
+import React, { useState } from 'react';
+import { 
+  Trophy, Users, User, LogIn, ChevronRight, Copy, 
+  Calendar, Medal, Shield, Clock, LogOut, CheckCircle2, Save, List
+} from 'lucide-react';
+
+// Estilo Global Injetado para Tipografia da Marca
+const globalStyles = `
+  @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;600;700&display=swap');
+  * { font-family: 'Montserrat', sans-serif; }
+  body { background-color: #f8fafc; margin: 0; padding: 0; }
+`;
+
+// --- DADOS SIMULADOS ---
+const MOCK_LEAGUES = [
+  { id: 1, name: 'Bolão Oficial Arkmeds', players: 42 },
+  { id: 2, name: 'Liga da TI', players: 12 },
+];
+
+const MOCK_MATCHES = [
+  { id: 1, phase: 'Fase de Grupos', teamA: 'Brasil', teamB: 'Sérvia', scoreA: null, scoreB: null, date: '2026-06-15T16:00:00Z', locked: true },
+  { id: 2, phase: 'Fase de Grupos', teamA: 'Espanha', teamB: 'Croácia', scoreA: null, scoreB: null, date: '2026-06-16T13:00:00Z', locked: false },
+  { id: 3, phase: 'Fase de Grupos', teamA: 'França', teamB: 'Holanda', scoreA: null, scoreB: null, date: '2026-06-18T16:00:00Z', locked: false },
+];
+
+const MOCK_GROUPS = [
+  {
+    name: 'Grupo G',
+    teams: [
+      { name: 'Brasil', pts: 3, p: 1, w: 1, d: 0, l: 0, gf: 2, ga: 0, gd: 2 },
+      { name: 'Suíça', pts: 3, p: 1, w: 1, d: 0, l: 0, gf: 1, ga: 0, gd: 1 },
+      { name: 'Camarões', pts: 0, p: 1, w: 0, d: 0, l: 1, gf: 0, ga: 1, gd: -1 },
+      { name: 'Sérvia', pts: 0, p: 1, w: 0, d: 0, l: 1, gf: 0, ga: 2, gd: -2 },
+    ]
+  },
+  {
+    name: 'Grupo B',
+    teams: [
+      { name: 'Espanha', pts: 0, p: 0, w: 0, d: 0, l: 0, gf: 0, ga: 0, gd: 0 },
+      { name: 'Croácia', pts: 0, p: 0, w: 0, d: 0, l: 0, gf: 0, ga: 0, gd: 0 },
+      { name: 'Itália', pts: 0, p: 0, w: 0, d: 0, l: 0, gf: 0, ga: 0, gd: 0 },
+      { name: 'Albânia', pts: 0, p: 0, w: 0, d: 0, l: 0, gf: 0, ga: 0, gd: 0 },
+    ]
+  }
+];
+
+const MOCK_RANKING = [
+  { rank: 1, name: 'Igor Henrique', points: 145, exactMatches: 4 },
+  { rank: 2, name: 'Ana Silva', points: 130, exactMatches: 3 },
+  { rank: 3, name: 'Carlos Santos', points: 115, exactMatches: 2 },
+  { rank: 4, name: 'Você', points: 95, exactMatches: 1 },
+];
+
+export default function App() {
+  const [view, setView] = useState('login'); // login, leagues, rules, dashboard, matches, ranking, profile
+  const [user, setUser] = useState(null);
+  const [currentLeague, setCurrentLeague] = useState(null);
+  const [hasSeenRules, setHasSeenRules] = useState(false);
+  const [matches, setMatches] = useState(MOCK_MATCHES);
+  
+  // Novos estados para a tela de Palpites
+  const [matchesTab, setMatchesTab] = useState('jogos'); // 'jogos' | 'tabela'
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  
+  // Handlers de Navegação
+  const handleLogin = () => {
+    setUser({ name: 'Colaborador Arkmeds', email: 'colaborador@arkmeds.com', avatar: '', bgColor: '#0097A9' });
+    setView('leagues');
+  };
+
+  const handleSelectLeague = (league) => {
+    setCurrentLeague(league);
+    if (!hasSeenRules) {
+      setView('rules');
+    } else {
+      setView('dashboard');
+    }
+  };
+
+  const acceptRules = () => {
+    setHasSeenRules(true);
+    setView('dashboard');
+  };
+
+  const updatePrediction = (id, field, value) => {
+    setMatches(matches.map(m => m.id === id ? { ...m, [field]: value } : m));
+    setSaveSuccess(false); // Remove o aviso de sucesso se o usuário alterar algo de novo
+  };
+
+  const handleSavePredictions = () => {
+    setIsSaving(true);
+    // Simulando delay de API e salvamento
+    setTimeout(() => {
+      setIsSaving(false);
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000); // Some após 3 segundos
+    }, 800);
+  };
+
+  const handleLogout = () => {
+    setUser(null);
+    setCurrentLeague(null);
+    setView('login');
+  };
+
+  // --- COMPONENTES DE UI ---
+  const Sidebar = () => (
+    <div className="w-64 bg-[#244C5A] text-white min-h-screen p-6 flex flex-col rounded-r-[40px] shadow-2xl z-10 relative">
+      <div className="flex items-center gap-3 mb-12">
+        <Trophy className="w-8 h-8 text-[#FFC72C]" />
+        <span className="text-xl font-bold tracking-wider">ARKMEDS</span>
+      </div>
+      
+      <nav className="flex-1 space-y-4">
+        {[
+          { id: 'dashboard', icon: Trophy, label: 'Meu Painel' },
+          { id: 'matches', icon: Calendar, label: 'Palpites' },
+          { id: 'ranking', icon: Medal, label: 'Ranking Geral' },
+          { id: 'leagues', icon: Users, label: 'Minhas Ligas' },
+          { id: 'profile', icon: User, label: 'Meu Perfil' },
+        ].map((item) => (
+          <button
+            key={item.id}
+            onClick={() => setView(item.id)}
+            className={`w-full flex items-center gap-4 px-4 py-3 rounded-2xl transition-all duration-300 ${
+              view === item.id 
+                ? 'bg-[#0097A9] text-white font-semibold shadow-lg' 
+                : 'text-slate-300 hover:bg-white/10 hover:text-white'
+            }`}
+          >
+            <item.icon className="w-5 h-5" />
+            {item.label}
+          </button>
+        ))}
+      </nav>
+
+      <button onClick={handleLogout} className="flex items-center gap-4 px-4 py-3 text-slate-400 hover:text-white transition-colors mt-auto">
+        <LogOut className="w-5 h-5" />
+        Sair
+      </button>
+    </div>
+  );
+
+  const Topbar = () => (
+    <header className="flex justify-between items-center mb-10">
+      <div>
+        <h1 className="text-3xl font-bold text-[#244C5A]">{currentLeague?.name || 'Dashboard'}</h1>
+        <p className="text-slate-500">Acompanhe os seus resultados e faça os seus palpites.</p>
+      </div>
+      <div className="flex items-center gap-4 bg-white px-4 py-2 rounded-full shadow-sm">
+        <div 
+          className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold"
+          style={{ backgroundColor: user?.bgColor || '#0097A9' }}
+        >
+          {user?.name.charAt(0)}
+        </div>
+        <span className="font-semibold text-[#244C5A]">{user?.name}</span>
+      </div>
+    </header>
+  );
+
+  // --- VIEWS ---
+  if (view === 'login') {
+    return (
+      <div className="min-h-screen bg-[#244C5A] flex items-center justify-center p-6 relative overflow-hidden">
+        <style>{globalStyles}</style>
+        {/* Grafismo Decorativo simulando o manual */}
+        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-[#0097A9] rounded-full mix-blend-multiply filter blur-[80px] opacity-40 animate-pulse"></div>
+        <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-[#FFC72C] rounded-full mix-blend-multiply filter blur-[80px] opacity-20"></div>
+        
+        <div className="bg-white/10 backdrop-blur-md p-10 rounded-[40px] shadow-2xl max-w-md w-full border border-white/20 text-center z-10">
+          <Trophy className="w-20 h-20 text-[#FFC72C] mx-auto mb-6" />
+          <h1 className="text-4xl font-bold text-white mb-2">Bolão da Copa</h1>
+          <p className="text-[#0097A9] font-semibold tracking-widest uppercase text-sm mb-10">Arkmeds 2026</p>
+          
+          <button 
+            onClick={handleLogin}
+            className="w-full bg-[#FFC72C] text-[#244C5A] font-bold py-4 px-6 rounded-3xl hover:bg-yellow-400 transition-all shadow-xl flex items-center justify-center gap-3 text-lg"
+          >
+            <LogIn className="w-5 h-5" />
+            Entrar com SSO Google
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (view === 'leagues') {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center p-10">
+        <style>{globalStyles}</style>
+        <div className="w-full max-w-4xl">
+          <div className="flex justify-between items-end mb-10">
+            <div>
+              <h1 className="text-4xl font-bold text-[#244C5A] mb-2">As Suas Ligas</h1>
+              <p className="text-slate-500">Selecione uma liga para jogar ou crie uma nova com os seus amigos.</p>
+            </div>
+            <button onClick={handleLogout} className="text-slate-400 hover:text-red-500 font-semibold flex items-center gap-2">
+              <LogOut className="w-4 h-4" /> Sair
+            </button>
+          </div>
+          
+          <div className="grid md:grid-cols-2 gap-6">
+            {MOCK_LEAGUES.map(league => (
+              <div 
+                key={league.id} 
+                onClick={() => handleSelectLeague(league)}
+                className="bg-white p-8 rounded-[40px] shadow-xl hover:shadow-2xl transition-all cursor-pointer border-2 border-transparent hover:border-[#0097A9] group flex flex-col justify-between"
+              >
+                <div>
+                  <Shield className="w-12 h-12 text-[#0097A9] mb-4 group-hover:scale-110 transition-transform" />
+                  <h2 className="text-2xl font-bold text-[#244C5A] mb-2">{league.name}</h2>
+                  <p className="text-slate-500 flex items-center gap-2">
+                    <Users className="w-4 h-4" /> {league.players} Participantes
+                  </p>
+                </div>
+                <div className="mt-8 flex justify-end">
+                  <div className="bg-slate-100 p-3 rounded-full group-hover:bg-[#FFC72C] transition-colors">
+                    <ChevronRight className="w-6 h-6 text-[#244C5A]" />
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            <div className="bg-slate-200/50 p-8 rounded-[40px] border-2 border-dashed border-slate-300 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-slate-200 transition-colors">
+              <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mb-4 shadow-sm">
+                <span className="text-3xl font-bold text-[#0097A9]">+</span>
+              </div>
+              <h2 className="text-xl font-bold text-[#244C5A]">Criar Nova Liga</h2>
+              <p className="text-slate-500 mt-2">Convide pessoas de fora da empresa.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (view === 'rules') {
+    return (
+      <div className="min-h-screen bg-[#244C5A]/95 backdrop-blur-sm fixed inset-0 z-50 flex items-center justify-center p-6">
+        <style>{globalStyles}</style>
+        <div className="bg-white w-full max-w-2xl rounded-[40px] shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300">
+          <div className="bg-[#0097A9] p-8 text-white text-center">
+            <Trophy className="w-16 h-16 text-[#FFC72C] mx-auto mb-4" />
+            <h2 className="text-3xl font-bold">Como Funciona o Bolão?</h2>
+          </div>
+          <div className="p-8 space-y-6 text-[#244C5A]">
+            <div className="flex gap-4">
+              <Clock className="w-8 h-8 text-[#0097A9] shrink-0" />
+              <div>
+                <h3 className="font-bold text-lg">Regras de Tempo</h3>
+                <p className="text-slate-600">Palpites de Campeão e Vice encerram 1h antes do 1º jogo do torneio. Palpites de partidas encerram 1h antes do apito inicial de cada jogo.</p>
+              </div>
+            </div>
+            <div className="flex gap-4">
+              <CheckCircle2 className="w-8 h-8 text-[#0097A9] shrink-0" />
+              <div>
+                <h3 className="font-bold text-lg">Pontuação Dinâmica</h3>
+                <p className="text-slate-600">Acertar o placar exato vale mais. Acertar apenas o vencedor vale menos. Os pontos multiplicam conforme a fase avança (Eliminatórias valem mais que Fase de Grupos).</p>
+              </div>
+            </div>
+            <div className="bg-slate-50 p-6 rounded-3xl mt-6">
+              <h3 className="font-bold text-lg mb-4 text-center">Defina o seu Pódio Antecipado</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Campeão</label>
+                  <select className="w-full p-4 rounded-2xl bg-white border-2 border-slate-200 focus:border-[#0097A9] focus:outline-none transition-colors mt-1 font-semibold text-[#244C5A]">
+                    <option>Selecione...</option>
+                    <option>Brasil</option>
+                    <option>França</option>
+                    <option>Argentina</option>
+                    <option>Portugal</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Vice-Campeão</label>
+                  <select className="w-full p-4 rounded-2xl bg-white border-2 border-slate-200 focus:border-[#0097A9] focus:outline-none transition-colors mt-1 font-semibold text-[#244C5A]">
+                    <option>Selecione...</option>
+                    <option>Brasil</option>
+                    <option>França</option>
+                    <option>Argentina</option>
+                    <option>Portugal</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="p-8 pt-0">
+            <button 
+              onClick={acceptRules}
+              className="w-full bg-[#FFC72C] text-[#244C5A] font-bold py-4 rounded-3xl hover:bg-yellow-400 transition-colors shadow-lg text-lg"
+            >
+              Entendi as Regras, Bora Jogar!
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // --- LAYOUT PRINCIPAL (Dashboard, Matches, Ranking, Profile) ---
+  return (
+    <div className="flex min-h-screen bg-slate-50">
+      <style>{globalStyles}</style>
+      <Sidebar />
+      
+      <main className="flex-1 p-10 overflow-y-auto">
+        <Topbar />
+
+        {view === 'dashboard' && (
+          <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            {/* Resumo */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="bg-[#244C5A] p-8 rounded-[40px] text-white shadow-xl relative overflow-hidden">
+                <div className="relative z-10">
+                  <p className="text-white/60 font-semibold uppercase tracking-widest text-sm mb-2">A Sua Posição</p>
+                  <div className="flex items-end gap-2">
+                    <span className="text-5xl font-bold">4º</span>
+                    <span className="text-xl mb-1 text-white/80">lugar</span>
+                  </div>
+                </div>
+                <Trophy className="absolute -right-4 -bottom-4 w-32 h-32 text-white/10" />
+              </div>
+
+              <div className="bg-[#0097A9] p-8 rounded-[40px] text-white shadow-xl relative overflow-hidden">
+                <div className="relative z-10">
+                  <p className="text-white/60 font-semibold uppercase tracking-widest text-sm mb-2">A Sua Pontuação</p>
+                  <div className="flex items-end gap-2">
+                    <span className="text-5xl font-bold text-[#FFC72C]">95</span>
+                    <span className="text-xl mb-1 text-white/80">pts</span>
+                  </div>
+                </div>
+                <Medal className="absolute -right-4 -bottom-4 w-32 h-32 text-white/10" />
+              </div>
+
+              <div className="bg-white p-8 rounded-[40px] text-[#244C5A] shadow-xl border border-slate-100 flex flex-col justify-center">
+                <p className="text-slate-400 font-semibold uppercase tracking-widest text-sm mb-4">Convide a Equipa</p>
+                <button 
+                  onClick={() => alert("Link copiado: bolao.arkmeds.com/invite/ti")}
+                  className="flex items-center justify-between bg-slate-50 p-4 rounded-2xl hover:bg-slate-100 transition-colors border border-slate-200"
+                >
+                  <span className="font-semibold truncate mr-2">bolao.arkmeds.com/invite/ti</span>
+                  <Copy className="w-5 h-5 text-[#0097A9]" />
+                </button>
+              </div>
+            </div>
+
+            {/* Próximos Jogos Mini-List */}
+            <div className="bg-white rounded-[40px] p-8 shadow-xl">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold text-[#244C5A]">Os Seus Palpites de Hoje</h2>
+                <button onClick={() => setView('matches')} className="text-[#0097A9] font-semibold hover:underline">Ver todos</button>
+              </div>
+              <div className="space-y-4">
+                {matches.slice(0, 2).map((match, i) => (
+                  <div key={i} className="flex items-center justify-between p-4 rounded-3xl bg-slate-50 border border-slate-100">
+                    <div className="flex-1 text-right font-bold text-lg text-[#244C5A]">{match.teamA}</div>
+                    <div className="px-6 flex gap-3 items-center">
+                      <input 
+                        type="number" 
+                        className="w-12 h-12 text-center text-xl font-bold bg-white rounded-xl border border-slate-200 disabled:bg-slate-100 disabled:text-slate-400" 
+                        placeholder="-" 
+                        disabled={match.locked} 
+                        value={match.scoreA || ''} 
+                        onChange={(e) => updatePrediction(match.id, 'scoreA', e.target.value)}
+                      />
+                      <span className="text-slate-400 font-bold">X</span>
+                      <input 
+                        type="number" 
+                        className="w-12 h-12 text-center text-xl font-bold bg-white rounded-xl border border-slate-200 disabled:bg-slate-100 disabled:text-slate-400" 
+                        placeholder="-" 
+                        disabled={match.locked} 
+                        value={match.scoreB || ''} 
+                        onChange={(e) => updatePrediction(match.id, 'scoreB', e.target.value)}
+                      />
+                    </div>
+                    <div className="flex-1 text-left font-bold text-lg text-[#244C5A]">{match.teamB}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {view === 'matches' && (
+          <div className="bg-white rounded-[40px] shadow-xl overflow-hidden animate-in fade-in duration-500">
+            <div className="p-8 border-b border-slate-100 bg-slate-50 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+              <div>
+                <h2 className="text-2xl font-bold text-[#244C5A]">Fase de Grupos</h2>
+                <p className="text-slate-500">Acompanhe a tabela e faça os seus palpites.</p>
+              </div>
+              
+              {/* Abas de Navegação interna */}
+              <div className="flex bg-slate-200/50 p-1.5 rounded-2xl w-full md:w-auto">
+                <button 
+                  onClick={() => setMatchesTab('jogos')} 
+                  className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl font-bold transition-all ${matchesTab === 'jogos' ? 'bg-white text-[#0097A9] shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                  <Calendar className="w-4 h-4" /> Jogos
+                </button>
+                <button 
+                  onClick={() => setMatchesTab('tabela')} 
+                  className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl font-bold transition-all ${matchesTab === 'tabela' ? 'bg-white text-[#0097A9] shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                  <List className="w-4 h-4" /> Tabela
+                </button>
+              </div>
+            </div>
+
+            <div className="p-8">
+              {matchesTab === 'jogos' ? (
+                <div className="space-y-6">
+                  {matches.map(match => (
+                    <div key={match.id} className={`p-6 rounded-3xl border-2 transition-all ${match.locked ? 'border-slate-100 bg-slate-50 opacity-75' : 'border-[#0097A9]/20 bg-white hover:border-[#0097A9]/50'}`}>
+                      <div className="flex justify-between items-center mb-6">
+                        <span className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                          <Calendar className="w-4 h-4" /> 
+                          {new Date(match.date).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
+                        </span>
+                        {match.locked ? (
+                          <span className="text-xs font-bold text-red-500 uppercase flex items-center gap-1 bg-red-50 px-3 py-1 rounded-full"><Clock className="w-3 h-3"/> Fechado</span>
+                        ) : (
+                          <span className="text-xs font-bold text-[#0097A9] uppercase flex items-center gap-1 bg-[#0097A9]/10 px-3 py-1 rounded-full"><Clock className="w-3 h-3"/> Aberto</span>
+                        )}
+                      </div>
+                      
+                      <div className="flex items-center justify-center gap-8">
+                        <div className="flex-1 text-right text-2xl font-bold text-[#244C5A]">{match.teamA}</div>
+                        <div className="flex gap-4 items-center bg-slate-100 p-3 rounded-2xl">
+                          <input 
+                            type="number" 
+                            value={match.scoreA || ''} 
+                            onChange={(e) => updatePrediction(match.id, 'scoreA', e.target.value)}
+                            disabled={match.locked}
+                            className="w-16 h-16 text-center text-3xl font-bold bg-white rounded-xl shadow-sm focus:border-2 focus:border-[#0097A9] focus:outline-none disabled:bg-slate-100 disabled:text-slate-400" 
+                          />
+                          <span className="text-slate-300 font-bold text-xl">X</span>
+                          <input 
+                            type="number" 
+                            value={match.scoreB || ''}
+                            onChange={(e) => updatePrediction(match.id, 'scoreB', e.target.value)}
+                            disabled={match.locked}
+                            className="w-16 h-16 text-center text-3xl font-bold bg-white rounded-xl shadow-sm focus:border-2 focus:border-[#0097A9] focus:outline-none disabled:bg-slate-100 disabled:text-slate-400" 
+                          />
+                        </div>
+                        <div className="flex-1 text-left text-2xl font-bold text-[#244C5A]">{match.teamB}</div>
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* Botão de Salvar Palpites */}
+                  <div className="flex justify-end items-center gap-4 pt-6 mt-8 border-t border-slate-100">
+                    {saveSuccess && (
+                      <span className="text-[#0097A9] font-bold flex items-center gap-2 animate-in fade-in slide-in-from-right-4 duration-300">
+                        <CheckCircle2 className="w-5 h-5" /> 
+                        Palpites salvos!
+                      </span>
+                    )}
+                    <button 
+                      onClick={handleSavePredictions}
+                      disabled={isSaving}
+                      className="bg-[#FFC72C] text-[#244C5A] font-bold py-4 px-8 rounded-2xl hover:bg-yellow-400 transition-colors shadow-lg flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+                    >
+                      <Save className="w-5 h-5" />
+                      {isSaving ? 'Salvando...' : 'Salvar Palpites'}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-12 animate-in fade-in duration-300">
+                  {MOCK_GROUPS.map((group, idx) => (
+                    <div key={idx} className="bg-white border border-slate-100 rounded-3xl overflow-hidden shadow-sm">
+                      <div className="bg-slate-50 p-4 border-b border-slate-100">
+                        <h3 className="font-bold text-lg text-[#244C5A] uppercase tracking-wider">{group.name}</h3>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left">
+                          <thead className="bg-white text-[10px] font-bold uppercase tracking-widest text-slate-400 border-b border-slate-100">
+                            <tr>
+                              <th className="p-4 pl-6">Seleção</th>
+                              <th className="p-4 text-center">PTS</th>
+                              <th className="p-4 text-center hidden sm:table-cell">J</th>
+                              <th className="p-4 text-center hidden sm:table-cell">V</th>
+                              <th className="p-4 text-center hidden sm:table-cell">E</th>
+                              <th className="p-4 text-center hidden sm:table-cell">D</th>
+                              <th className="p-4 text-center hidden md:table-cell">GP</th>
+                              <th className="p-4 text-center hidden md:table-cell">GC</th>
+                              <th className="p-4 text-center">SG</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-50">
+                            {group.teams.map((team, tIdx) => (
+                              <tr key={tIdx} className="hover:bg-slate-50 transition-colors">
+                                <td className="p-4 pl-6 font-bold text-[#244C5A] flex items-center gap-3 whitespace-nowrap">
+                                  <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${tIdx < 2 ? 'bg-[#0097A9]/10 text-[#0097A9]' : 'bg-slate-100 text-slate-400'}`}>
+                                    {tIdx + 1}
+                                  </span>
+                                  {team.name}
+                                </td>
+                                <td className="p-4 text-center font-bold text-[#0097A9] text-lg">{team.pts}</td>
+                                <td className="p-4 text-center text-slate-500 font-semibold hidden sm:table-cell">{team.p}</td>
+                                <td className="p-4 text-center text-slate-500 hidden sm:table-cell">{team.w}</td>
+                                <td className="p-4 text-center text-slate-500 hidden sm:table-cell">{team.d}</td>
+                                <td className="p-4 text-center text-slate-500 hidden sm:table-cell">{team.l}</td>
+                                <td className="p-4 text-center text-slate-500 hidden md:table-cell">{team.gf}</td>
+                                <td className="p-4 text-center text-slate-500 hidden md:table-cell">{team.ga}</td>
+                                <td className="p-4 text-center font-semibold text-slate-700">{team.gd}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {view === 'ranking' && (
+          <div className="bg-white rounded-[40px] shadow-xl p-8 animate-in fade-in duration-500">
+            <h2 className="text-2xl font-bold text-[#244C5A] mb-8">Ranking Geral - {currentLeague?.name}</h2>
+            
+            <div className="overflow-x-auto rounded-3xl border border-slate-100">
+              <table className="w-full text-left">
+                <thead className="bg-slate-50 border-b border-slate-100 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                  <tr>
+                    <th className="p-6">Posição</th>
+                    <th className="p-6">Jogador</th>
+                    <th className="p-6 text-center">Placares Exatos</th>
+                    <th className="p-6 text-right">Pontos</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {MOCK_RANKING.map((player) => (
+                    <tr key={player.rank} className={`hover:bg-slate-50 transition-colors ${player.name === 'Você' ? 'bg-[#FFC72C]/10 hover:bg-[#FFC72C]/20' : ''}`}>
+                      <td className="p-6">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold
+                          ${player.rank === 1 ? 'bg-[#FFC72C] text-[#244C5A]' : 
+                            player.rank === 2 ? 'bg-slate-300 text-[#244C5A]' : 
+                            player.rank === 3 ? 'bg-amber-600 text-white' : 'bg-slate-100 text-slate-500'}`}
+                        >
+                          {player.rank}º
+                        </div>
+                      </td>
+                      <td className="p-6 font-bold text-[#244C5A] text-lg flex items-center gap-3">
+                        {player.name === 'Você' && <div className="w-2 h-2 rounded-full bg-[#0097A9]"></div>}
+                        {player.name}
+                      </td>
+                      <td className="p-6 text-center text-slate-500 font-semibold">{player.exactMatches}</td>
+                      <td className="p-6 text-right font-bold text-2xl text-[#0097A9]">{player.points} <span className="text-sm text-slate-400">pts</span></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {view === 'profile' && (
+          <div className="max-w-2xl bg-white rounded-[40px] shadow-xl p-10 animate-in fade-in duration-500">
+            <h2 className="text-2xl font-bold text-[#244C5A] mb-8">O Meu Perfil</h2>
+            
+            <div className="flex items-center gap-8 mb-10">
+              <div 
+                className="w-32 h-32 rounded-[40px] flex items-center justify-center text-5xl text-white font-bold shadow-lg transition-colors"
+                style={{ backgroundColor: user?.bgColor || '#0097A9' }}
+              >
+                {user?.name.charAt(0)}
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-[#244C5A]">{user?.name}</h3>
+                <p className="text-slate-500 mb-4">{user?.email}</p>
+                <button className="bg-slate-100 text-[#244C5A] px-4 py-2 rounded-xl font-semibold hover:bg-slate-200 transition-colors text-sm">
+                  Alterar Foto
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-6">
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest block mb-2">Cor do Avatar</label>
+                <div className="flex gap-4">
+                  {['#0097A9', '#244C5A', '#FFC72C', '#ef4444', '#8b5cf6'].map(color => (
+                    <button 
+                      key={color}
+                      onClick={() => setUser({...user, bgColor: color})}
+                      className={`w-12 h-12 rounded-2xl transition-transform ${user?.bgColor === color ? 'scale-110 ring-4 ring-offset-2 ring-slate-200' : 'hover:scale-105'}`}
+                      style={{ backgroundColor: color }}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              <div className="pt-6 border-t border-slate-100">
+                <button onClick={handleLogout} className="flex items-center gap-2 text-red-500 font-bold hover:bg-red-50 p-4 rounded-2xl transition-colors w-full">
+                  <LogOut className="w-5 h-5" />
+                  Desconectar Conta
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </main>
+    </div>
+  );
+}

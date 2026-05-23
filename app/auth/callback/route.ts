@@ -27,7 +27,8 @@ export async function GET(request: NextRequest) {
     const { error } = await supabase.auth.exchangeCodeForSession(code)
 
     if (!error) {
-      return NextResponse.redirect(new URL('/dashboard', request.url))
+      // Redirect to a client-side page that checks sessionStorage for inviteRedirect
+      return NextResponse.redirect(new URL('/auth/callback-redirect', request.url))
     }
 
     console.warn('[auth/callback] Falha na troca de code:', error.message)
