@@ -13,6 +13,7 @@
 
 -- 1. Remover policy recursiva de league_members
 DROP POLICY IF EXISTS "league_members_select" ON public.league_members;
+DROP POLICY IF EXISTS "league_members_select_own" ON public.league_members;
 
 -- 2. Policy correta: sem auto-referência
 CREATE POLICY "league_members_select_own" ON public.league_members
