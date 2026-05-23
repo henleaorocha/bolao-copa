@@ -3,7 +3,7 @@
 import { usePathname } from 'next/navigation'
 import { Topbar } from './Topbar'
 
-const PUBLIC_ROUTES = ['/login', '/auth/callback', '/join']
+const PUBLIC_ROUTES = ['/login', '/auth/callback', '/join', '/ligas']
 
 export function LayoutWrapper({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()

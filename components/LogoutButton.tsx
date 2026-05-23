@@ -29,7 +29,7 @@ export default function LogoutButton() {
       onClick={handleLogout}
       disabled={loading}
       aria-label="Sair da conta"
-      className="min-h-[44px] rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:opacity-50"
+      className="text-sm font-medium text-white/80 hover:text-white transition-colors disabled:opacity-50"
     >
       {loading ? 'Saindo...' : 'Sair'}
     </button>
