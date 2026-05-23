@@ -3,6 +3,17 @@ import { getSupabaseServerClient } from '@/lib/supabase/client'
 import { formatSuccess, formatError } from '@/lib/api/responses'
 import type { LeagueDetail, LeagueMember } from '@/lib/api/types'
 
+interface LeagueMemberRecord {
+  user_id: string
+  role: 'admin' | 'member'
+  joined_at: string
+  users: {
+    full_name: string | null
+    avatar_url: string | null
+    avatar_color: string
+  }[]
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -95,11 +106,11 @@ export async function GET(
     }
 
     // Map members to LeagueMember[]
-    const members: LeagueMember[] = membersResult.data.map((row: any) => ({
+    const members: LeagueMember[] = membersResult.data.map((row: LeagueMemberRecord) => ({
       user_id: row.user_id,
-      full_name: row.users?.full_name ?? null,
-      avatar_url: row.users?.avatar_url ?? null,
-      avatar_color: row.users?.avatar_color ?? '',
+      full_name: row.users?.[0]?.full_name ?? null,
+      avatar_url: row.users?.[0]?.avatar_url ?? null,
+      avatar_color: row.users?.[0]?.avatar_color ?? '',
       role: row.role,
       joined_at: row.joined_at,
     }))

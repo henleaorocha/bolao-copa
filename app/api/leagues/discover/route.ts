@@ -3,6 +3,19 @@ import { getSupabaseServerClient } from '@/lib/supabase/client'
 import { formatSuccess, formatError } from '@/lib/api/responses'
 import type { LeagueSummary } from '@/lib/api/types'
 
+interface LeagueMembershipRecord {
+  league_id: string
+}
+
+interface LeagueRecord {
+  id: string
+  name: string
+  access_type: 'open' | 'private'
+  logo_url: string | null
+  member_count: number
+  created_at: string
+}
+
 export async function GET(request: NextRequest) {
   const start = Date.now()
 
@@ -46,7 +59,7 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const userLeagueIds = userLeaguesResult.data.map((row: any) => row.league_id)
+    const userLeagueIds = userLeaguesResult.data.map((row: LeagueMembershipRecord) => row.league_id)
 
     // Get all open leagues, ordered by member_count DESC, created_at DESC
     const result = await supabase
@@ -66,8 +79,8 @@ export async function GET(request: NextRequest) {
 
     // Filter out leagues the user is already a member of
     const leagues: LeagueSummary[] = result.data
-      .filter((league: any) => !userLeagueIds.includes(league.id))
-      .map((league: any) => ({
+      .filter((league: LeagueRecord) => !userLeagueIds.includes(league.id))
+      .map((league: LeagueRecord) => ({
         id: league.id,
         name: league.name,
         access_type: league.access_type,

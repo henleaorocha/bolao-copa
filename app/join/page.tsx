@@ -1,3 +1,5 @@
+import Link from 'next/link'
+import Image from 'next/image'
 import { getSupabaseServerClient } from '@/lib/supabase/client'
 import { JoinButton } from './JoinButton'
 
@@ -19,12 +21,12 @@ export default async function JoinPage({ searchParams }: JoinPageProps) {
           <p className="mb-6 text-center text-sm text-gray-600">
             O link que você está usando não é válido ou expirou. Tente solicitar um novo convite do administrador da liga.
           </p>
-          <a
+          <Link
             href="/ligas"
             className="block rounded-lg bg-blue-600 px-4 py-2 text-center text-sm font-semibold text-white hover:bg-blue-700"
           >
             Voltar para Ligas
-          </a>
+          </Link>
         </div>
       </div>
     )
@@ -54,12 +56,12 @@ export default async function JoinPage({ searchParams }: JoinPageProps) {
           <p className="mb-6 text-center text-sm text-gray-600">
             Não conseguimos encontrar a liga associada a este link. Verifique se o link está correto e tente novamente.
           </p>
-          <a
+          <Link
             href="/ligas"
             className="block rounded-lg bg-blue-600 px-4 py-2 text-center text-sm font-semibold text-white hover:bg-blue-700"
           >
             Voltar para Ligas
-          </a>
+          </Link>
         </div>
       </div>
     )
@@ -105,9 +107,11 @@ export default async function JoinPage({ searchParams }: JoinPageProps) {
       <div className="w-full max-w-sm rounded-2xl bg-white p-8 shadow-md">
         <div className="mb-6 text-center">
           {league.logo_url ? (
-            <img
+            <Image
               src={league.logo_url}
               alt={league.name}
+              width={80}
+              height={80}
               className="mx-auto mb-4 h-20 w-20 rounded-lg object-cover"
             />
           ) : (

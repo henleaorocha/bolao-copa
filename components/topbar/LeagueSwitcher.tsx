@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useLeague } from '@/lib/league-context'
-import type { LeagueSummary, ApiResponse } from '@/lib/api/types'
+import type { LeagueSummary, ApiResponse, AuthUser } from '@/lib/api/types'
 
 export function LeagueSwitcher() {
   const { league: activeLeague, setLeague } = useLeague()
@@ -56,7 +56,7 @@ export function LeagueSwitcher() {
         return
       }
 
-      const data: ApiResponse<{ user: any; league: LeagueSummary }> = await res.json()
+      const data: ApiResponse<{ user: Omit<AuthUser, 'created_at'>; league: LeagueSummary }> = await res.json()
       if (data.status === 'success' && data.data?.league) {
         setLeague(data.data.league)
         setIsOpen(false)

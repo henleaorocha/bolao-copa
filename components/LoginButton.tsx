@@ -20,8 +20,8 @@ export default function LoginButton() {
   return (
     <button
       onClick={handleLogin}
-      aria-label="Entrar com Google"
-      className="flex min-h-[44px] w-full items-center justify-center gap-3 rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+      aria-label="Continuar com Google"
+      className="w-full bg-white text-slate-900 font-bold py-4 px-6 rounded-2xl hover:scale-[1.01] active:scale-[0.99] transition shadow-xl flex items-center justify-center gap-3"
     >
       <svg
         aria-hidden="true"
@@ -47,7 +47,7 @@ export default function LoginButton() {
           fill="#EA4335"
         />
       </svg>
-      Entrar com Google
+      Continuar com Google
     </button>
   )
 }

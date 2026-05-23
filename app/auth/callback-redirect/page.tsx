@@ -15,8 +15,8 @@ export default function CallbackRedirectPage() {
       sessionStorage.removeItem('inviteRedirect')
       router.push(inviteRedirect)
     } else {
-      // No invite redirect, go to dashboard
-      router.push('/dashboard')
+      // No invite redirect, go to leagues hub
+      router.push('/ligas')
     }
   }, [router])
 

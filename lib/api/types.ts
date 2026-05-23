@@ -1,3 +1,7 @@
+import type { CopaCountdown } from '@/lib/leagues/get-days-until-copa'
+
+export type { CopaCountdown }
+
 export type ApiSuccessResponse<T> = {
   status: 'success'
   data: T
@@ -60,3 +64,32 @@ export interface AuthMeResponse {
   user: AuthUser
   league: LeagueSummary
 }
+
+export interface LeagueMemberWithLeague {
+  league_id: string
+  joined_at: string
+  role: 'admin' | 'member'
+  leagues: {
+    id: string
+    name: string
+    access_type: 'open' | 'private'
+    logo_url: string | null
+    member_count: number
+  }[]
+}
+
+export interface LeagueHubItem {
+  id: string
+  name: string
+  access_type: 'open' | 'private'
+  logo_url: string | null
+  member_count: number
+  is_member: boolean
+  is_main: boolean
+}
+
+export type LeagueHubResponse = ApiSuccessResponse<{
+  leagues: LeagueHubItem[]
+  user: { first_name: string }
+  countdown: CopaCountdown
+}>

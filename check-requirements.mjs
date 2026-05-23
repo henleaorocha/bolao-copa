@@ -79,14 +79,12 @@ const requirements = [
 console.log('\n✅ REQUIREMENT VERIFICATION CHECKLIST:\n');
 
 let passed = 0;
-let failed = 0;
 
 requirements.forEach(req => {
   const check = req.check();
   const status = check ? '✓' : '✗';
   console.log(`${status} Req ${req.id.padStart(2)}: ${req.name}`);
   if (check) passed++;
-  else failed++;
 });
 
 console.log(`\n📊 Summary: ${passed}/${requirements.length} requirements verified in code`);

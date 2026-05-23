@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
+import Image from 'next/image'
 import { useLeague } from '@/lib/league-context'
 import type { LeagueDetail } from '@/lib/api/types'
 
@@ -32,9 +33,11 @@ function InitialAvatar({
   if (logo_url) {
     return (
       <div className={`${sizeClasses[size]} rounded-2xl overflow-hidden flex-shrink-0`}>
-        <img
+        <Image
           src={logo_url}
           alt={name}
+          width={80}
+          height={80}
           className="w-full h-full object-cover"
         />
       </div>
@@ -63,9 +66,11 @@ function UserAvatar({
   if (avatar_url) {
     return (
       <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0">
-        <img
+        <Image
           src={avatar_url}
           alt={full_name || 'User'}
+          width={40}
+          height={40}
           className="w-full h-full object-cover"
         />
       </div>
@@ -275,7 +280,7 @@ function ConfirmDialog({
             />
             {confirmValue && (
               <p className="text-xs text-slate-500 mt-1">
-                Digite "{confirmValue}" para confirmar
+                Digite &quot;{confirmValue}&quot; para confirmar
               </p>
             )}
           </div>

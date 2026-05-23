@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseServerClient } from '@/lib/supabase/client'
 import { formatSuccess, formatError } from '@/lib/api/responses'
-import type { LeagueSummary } from '@/lib/api/types'
+import type { LeagueSummary, LeagueMemberWithLeague } from '@/lib/api/types'
 
 export async function GET(request: NextRequest) {
   const start = Date.now()
@@ -60,13 +60,13 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const leagues: LeagueSummary[] = result.data.map((row: any) => ({
-      id: row.leagues.id,
-      name: row.leagues.name,
-      access_type: row.leagues.access_type,
-      logo_url: row.leagues.logo_url,
+    const leagues: LeagueSummary[] = result.data.map((row: LeagueMemberWithLeague) => ({
+      id: row.leagues[0].id,
+      name: row.leagues[0].name,
+      access_type: row.leagues[0].access_type,
+      logo_url: row.leagues[0].logo_url,
       role: row.role,
-      member_count: row.leagues.member_count,
+      member_count: row.leagues[0].member_count,
     }))
 
     const duration = Date.now() - start
