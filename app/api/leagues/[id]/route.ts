@@ -7,6 +7,7 @@ interface LeagueMemberRecord {
   user_id: string
   role: 'admin' | 'member'
   joined_at: string
+  onboarded_at: string | null
   users: {
     full_name: string | null
     avatar_url: string | null
@@ -63,11 +64,11 @@ export async function GET(
       )
     }
 
-    // Fetch league details (exclude invite_token)
+    // Fetch league details
     const leagueResult = await supabase
       .from('leagues')
       .select(
-        `id, name, access_type, logo_url, member_count, description, created_by, created_at`
+        `id, name, access_type, logo_url, member_count, description, created_by, created_at, invite_token`
       )
       .eq('id', leagueId)
       .single()
@@ -87,6 +88,7 @@ export async function GET(
         user_id,
         role,
         joined_at,
+        onboarded_at,
         users (
           full_name,
           avatar_url,
@@ -115,6 +117,9 @@ export async function GET(
       joined_at: row.joined_at,
     }))
 
+    const currentMember = membersResult.data.find((m: LeagueMemberRecord) => m.user_id === user.id)
+    const user_onboarded_at = currentMember?.onboarded_at ?? null
+
     const duration = Date.now() - start
     console.log(
       JSON.stringify({
@@ -129,11 +134,12 @@ export async function GET(
       })
     )
 
-    const response: LeagueDetail = {
+    const response = {
       ...leagueResult.data,
       role: membershipCheck.data.role,
+      user_onboarded_at,
       members,
-    }
+    } as LeagueDetail
 
     return NextResponse.json(formatSuccess(response), { status: 200 })
   } catch (err) {

@@ -11,6 +11,7 @@ import {
   deleteTestLeague,
   addTestLeagueMember,
   adminClient,
+  authedClient,
 } from '../fixtures/factories'
 
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'
@@ -254,6 +255,131 @@ describe.skipIf(!HAS_SERVICE_KEY)('League endpoints', () => {
       await deleteTestLeague(leagueId)
     })
 
+    it('persists prize_pool when provided', async () => {
+      const admin = adminClient()
+      const res = await fetch(`${BASE_URL}/api/leagues`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: `sb-access-token=${user1Session.access_token}`,
+        },
+        body: JSON.stringify({
+          name: 'Prize League',
+          access_type: 'private',
+          prize_pool: '1º lugar: jantar',
+        }),
+      })
+
+      expect(res.status).toBe(201)
+      const json = await res.json()
+      const leagueId = json.data.id
+
+      try {
+        const leagueRow = await admin
+          .from('leagues')
+          .select('prize_pool')
+          .eq('id', leagueId)
+          .single()
+
+        expect(leagueRow.error).toBeNull()
+        expect(leagueRow.data?.prize_pool).toBe('1º lugar: jantar')
+      } finally {
+        await deleteTestLeague(leagueId)
+      }
+    })
+
+    it('stores prize_pool as null when omitted', async () => {
+      const admin = adminClient()
+      const res = await fetch(`${BASE_URL}/api/leagues`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: `sb-access-token=${user1Session.access_token}`,
+        },
+        body: JSON.stringify({
+          name: 'No Prize League',
+          access_type: 'private',
+        }),
+      })
+
+      expect(res.status).toBe(201)
+      const json = await res.json()
+      const leagueId = json.data.id
+
+      try {
+        const leagueRow = await admin
+          .from('leagues')
+          .select('prize_pool')
+          .eq('id', leagueId)
+          .single()
+
+        expect(leagueRow.error).toBeNull()
+        expect(leagueRow.data?.prize_pool).toBeNull()
+      } finally {
+        await deleteTestLeague(leagueId)
+      }
+    })
+
+    it('rejects prize_pool longer than 300 characters', async () => {
+      const res = await fetch(`${BASE_URL}/api/leagues`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: `sb-access-token=${user1Session.access_token}`,
+        },
+        body: JSON.stringify({
+          name: 'Test League',
+          access_type: 'private',
+          prize_pool: 'A'.repeat(301),
+        }),
+      })
+
+      expect(res.status).toBe(400)
+      const json = await res.json()
+      expect(json.code).toBe('INVALID_BODY')
+    })
+
+    it('rejects non-string prize_pool', async () => {
+      const res = await fetch(`${BASE_URL}/api/leagues`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: `sb-access-token=${user1Session.access_token}`,
+        },
+        body: JSON.stringify({
+          name: 'Test League',
+          access_type: 'private',
+          prize_pool: 123,
+        }),
+      })
+
+      expect(res.status).toBe(400)
+      const json = await res.json()
+      expect(json.code).toBe('INVALID_BODY')
+    })
+
+    it('response body does not contain prize_pool', async () => {
+      const res = await fetch(`${BASE_URL}/api/leagues`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: `sb-access-token=${user1Session.access_token}`,
+        },
+        body: JSON.stringify({
+          name: 'Shape Test League',
+          access_type: 'private',
+          prize_pool: '1º lugar: viagem',
+        }),
+      })
+
+      expect(res.status).toBe(201)
+      const json = await res.json()
+      expect(json.data).not.toHaveProperty('prize_pool')
+
+      // Cleanup
+      await deleteTestLeague(json.data.id)
+    })
+
     it('sets active_league_id on creator', async () => {
       const admin = adminClient()
       const res = await fetch(`${BASE_URL}/api/leagues`, {
@@ -381,6 +507,303 @@ describe.skipIf(!HAS_SERVICE_KEY)('League endpoints', () => {
         await admin.from('league_members').delete().in('league_id', [league1.id, league2.id])
         await deleteTestLeague(league1.id)
         await deleteTestLeague(league2.id)
+      }
+    })
+  })
+
+  describe('GET /api/leagues/{id} (task_03)', () => {
+    it('returns 401 SESSION_EXPIRED for unauthenticated requests', async () => {
+      const res = await fetch(`${BASE_URL}/api/leagues/00000000-0000-0000-0000-000000000001`)
+      expect(res.status).toBe(401)
+      const json = await res.json()
+      expect(json.code).toBe('SESSION_EXPIRED')
+    })
+
+    it('invite_token is present and non-null for a newly created league', async () => {
+      const admin = adminClient()
+      const league = await createTestLeague('Invite Token League', 'private', user1Id)
+
+      try {
+        const { data, error } = await admin
+          .from('leagues')
+          .select('invite_token')
+          .eq('id', league.id)
+          .single()
+
+        expect(error).toBeNull()
+        expect(data?.invite_token).toBeTruthy()
+        expect(typeof data?.invite_token).toBe('string')
+      } finally {
+        await deleteTestLeague(league.id)
+      }
+    })
+
+    it('user_onboarded_at is null for a fresh league member', async () => {
+      const admin = adminClient()
+      const league = await createTestLeague('Onboarding Fresh League', 'private', user1Id)
+      await addTestLeagueMember(league.id, user2Id, 'member')
+
+      try {
+        const { data, error } = await admin
+          .from('league_members')
+          .select('onboarded_at')
+          .eq('league_id', league.id)
+          .eq('user_id', user2Id)
+          .single()
+
+        expect(error).toBeNull()
+        expect(data?.onboarded_at).toBeNull()
+      } finally {
+        await admin.from('league_members').delete().eq('league_id', league.id)
+        await deleteTestLeague(league.id)
+      }
+    })
+
+    it('user_onboarded_at is an ISO timestamp after member sets it', async () => {
+      const admin = adminClient()
+      const league = await createTestLeague('Onboarding Set League', 'private', user1Id)
+      await addTestLeagueMember(league.id, user2Id, 'member')
+
+      try {
+        const client = authedClient(user2Session.access_token)
+        const now = new Date().toISOString()
+        const { error: updateError } = await client
+          .from('league_members')
+          .update({ onboarded_at: now })
+          .eq('league_id', league.id)
+          .eq('user_id', user2Id)
+
+        expect(updateError).toBeNull()
+
+        const { data, error } = await admin
+          .from('league_members')
+          .select('onboarded_at')
+          .eq('league_id', league.id)
+          .eq('user_id', user2Id)
+          .single()
+
+        expect(error).toBeNull()
+        expect(data?.onboarded_at).not.toBeNull()
+        expect(new Date(data!.onboarded_at!).toISOString()).toBe(data!.onboarded_at)
+      } finally {
+        await admin.from('league_members').delete().eq('league_id', league.id)
+        await deleteTestLeague(league.id)
+      }
+    })
+
+    it('GET /api/leagues/{id} response object includes invite_token and user_onboarded_at fields (shape regression)', async () => {
+      const admin = adminClient()
+      const league = await createTestLeague('Shape Check League', 'private', user1Id)
+      await addTestLeagueMember(league.id, user1Id, 'member')
+
+      try {
+        const client = authedClient(user1Session.access_token)
+        const { data, error } = await client
+          .from('leagues')
+          .select('id, name, access_type, logo_url, member_count, description, created_by, created_at, invite_token')
+          .eq('id', league.id)
+          .single()
+
+        expect(error).toBeNull()
+        expect(data).toHaveProperty('invite_token')
+        expect(data?.invite_token).toBeTruthy()
+
+        const { data: memberData, error: memberError } = await admin
+          .from('league_members')
+          .select('onboarded_at')
+          .eq('league_id', league.id)
+          .eq('user_id', user1Id)
+          .single()
+
+        expect(memberError).toBeNull()
+        expect(memberData).toHaveProperty('onboarded_at')
+        expect(memberData?.onboarded_at).toBeNull()
+      } finally {
+        await admin.from('league_members').delete().eq('league_id', league.id)
+        await deleteTestLeague(league.id)
+      }
+    })
+  })
+
+  describe('PATCH /api/leagues/{id}/me (task_04)', () => {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? ''
+    const projectRef = new URL(supabaseUrl).hostname.split('.')[0]
+    const authCookieName = `sb-${projectRef}-auth-token`
+
+    function sessionCookieValue(session: any): string {
+      const encoded = Buffer.from(JSON.stringify(session)).toString('base64url')
+      return `base64-${encoded}`
+    }
+
+    it('returns 401 SESSION_EXPIRED when no session', async () => {
+      const res = await fetch(
+        `${BASE_URL}/api/leagues/00000000-0000-0000-0000-000000000001/me`,
+        { method: 'PATCH' }
+      )
+      expect(res.status).toBe(401)
+      const json = await res.json()
+      expect(json.code).toBe('SESSION_EXPIRED')
+    })
+
+    it('returns 204 and sets onboarded_at for an authenticated member', async () => {
+      const admin = adminClient()
+      const league = await createTestLeague('PATCH Onboard League', 'private', user1Id)
+      await addTestLeagueMember(league.id, user1Id, 'member')
+
+      try {
+        const res = await fetch(`${BASE_URL}/api/leagues/${league.id}/me`, {
+          method: 'PATCH',
+          headers: {
+            Cookie: `${authCookieName}=${sessionCookieValue(user1Session)}`,
+          },
+        })
+        expect(res.status).toBe(204)
+
+        const { data, error } = await admin
+          .from('league_members')
+          .select('onboarded_at')
+          .eq('league_id', league.id)
+          .eq('user_id', user1Id)
+          .single()
+
+        expect(error).toBeNull()
+        expect(data?.onboarded_at).not.toBeNull()
+      } finally {
+        await admin.from('league_members').delete().eq('league_id', league.id)
+        await deleteTestLeague(league.id)
+      }
+    })
+
+    it('is idempotent — calling twice returns 204 both times', async () => {
+      const admin = adminClient()
+      const league = await createTestLeague('PATCH Idempotent League', 'private', user1Id)
+      await addTestLeagueMember(league.id, user1Id, 'member')
+
+      try {
+        const cookieHeader = {
+          Cookie: `${authCookieName}=${sessionCookieValue(user1Session)}`,
+        }
+
+        const res1 = await fetch(`${BASE_URL}/api/leagues/${league.id}/me`, {
+          method: 'PATCH',
+          headers: cookieHeader,
+        })
+        expect(res1.status).toBe(204)
+
+        const res2 = await fetch(`${BASE_URL}/api/leagues/${league.id}/me`, {
+          method: 'PATCH',
+          headers: cookieHeader,
+        })
+        expect(res2.status).toBe(204)
+      } finally {
+        await admin.from('league_members').delete().eq('league_id', league.id)
+        await deleteTestLeague(league.id)
+      }
+    })
+
+    it('returns 403 for a user who is not a member of the league', async () => {
+      const league = await createTestLeague('PATCH Non-Member League', 'private', user1Id)
+
+      try {
+        const res = await fetch(`${BASE_URL}/api/leagues/${league.id}/me`, {
+          method: 'PATCH',
+          headers: {
+            Cookie: `${authCookieName}=${sessionCookieValue(user2Session)}`,
+          },
+        })
+        expect(res.status).toBe(403)
+        const json = await res.json()
+        expect(json.code).toBe('NOT_A_MEMBER')
+      } finally {
+        await deleteTestLeague(league.id)
+      }
+    })
+  })
+
+  describe('league_members.onboarded_at migration (task_01)', () => {
+    it('league_members table is intact after migration (regression)', async () => {
+      const admin = adminClient()
+      const league = await createTestLeague('Regression League', 'private', user1Id)
+      await addTestLeagueMember(league.id, user1Id, 'member')
+
+      try {
+        // Verify the table is readable and onboarded_at column is present with null default
+        const { data, error } = await admin
+          .from('league_members')
+          .select('id, league_id, user_id, role, joined_at, onboarded_at')
+          .eq('league_id', league.id)
+          .eq('user_id', user1Id)
+          .single()
+
+        expect(error).toBeNull()
+        expect(data).toHaveProperty('onboarded_at')
+        expect(data?.onboarded_at).toBeNull()
+        expect(data?.role).toBe('member')
+      } finally {
+        await admin.from('league_members').delete().eq('league_id', league.id)
+        await deleteTestLeague(league.id)
+      }
+    })
+
+    it('member can UPDATE their own onboarded_at (RLS allows)', async () => {
+      const admin = adminClient()
+      const league = await createTestLeague('Onboard Allow League', 'private', user1Id)
+      await addTestLeagueMember(league.id, user1Id, 'member')
+
+      try {
+        const client = authedClient(user1Session.access_token)
+        const now = new Date().toISOString()
+        const { error } = await client
+          .from('league_members')
+          .update({ onboarded_at: now })
+          .eq('league_id', league.id)
+          .eq('user_id', user1Id)
+
+        expect(error).toBeNull()
+
+        const verify = await admin
+          .from('league_members')
+          .select('onboarded_at')
+          .eq('league_id', league.id)
+          .eq('user_id', user1Id)
+          .single()
+
+        expect(verify.error).toBeNull()
+        expect(verify.data?.onboarded_at).not.toBeNull()
+      } finally {
+        await admin.from('league_members').delete().eq('league_id', league.id)
+        await deleteTestLeague(league.id)
+      }
+    })
+
+    it('member CANNOT UPDATE another user\'s onboarded_at (RLS denies)', async () => {
+      const admin = adminClient()
+      const league = await createTestLeague('Onboard Deny League', 'private', user1Id)
+      await addTestLeagueMember(league.id, user1Id, 'member')
+      await addTestLeagueMember(league.id, user2Id, 'member')
+
+      try {
+        // user2 tries to update user1's row
+        const client = authedClient(user2Session.access_token)
+        await client
+          .from('league_members')
+          .update({ onboarded_at: new Date().toISOString() })
+          .eq('league_id', league.id)
+          .eq('user_id', user1Id)
+
+        // verify user1's row was NOT updated
+        const verify = await admin
+          .from('league_members')
+          .select('onboarded_at')
+          .eq('league_id', league.id)
+          .eq('user_id', user1Id)
+          .single()
+
+        expect(verify.error).toBeNull()
+        expect(verify.data?.onboarded_at).toBeNull()
+      } finally {
+        await admin.from('league_members').delete().eq('league_id', league.id)
+        await deleteTestLeague(league.id)
       }
     })
   })

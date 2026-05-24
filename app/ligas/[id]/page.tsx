@@ -5,6 +5,7 @@ import { useRouter, useParams } from 'next/navigation'
 import Image from 'next/image'
 import { useLeague } from '@/lib/league-context'
 import type { LeagueDetail } from '@/lib/api/types'
+import LeagueWelcomeModal from '@/components/LeagueWelcomeModal'
 
 const DESIGN_COLORS = ['#FFC72C', '#0097A9', '#244C5A', '#7E4FE3', '#16A34A', '#FB923C']
 
@@ -320,6 +321,7 @@ export default function LeagueDetailPage() {
   const [error, setError] = useState<string | null>(null)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
 
+  const [showWelcomeModal, setShowWelcomeModal] = useState(false)
   const [showConfigureModal, setShowConfigureModal] = useState(false)
   const [showRemoveConfirm, setShowRemoveConfirm] = useState<string | null>(null)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
@@ -344,6 +346,7 @@ export default function LeagueDetailPage() {
         }
         const data = await res.json()
         setLeague(data.data)
+        setShowWelcomeModal(data.data.user_onboarded_at === null)
       } catch (err) {
         setError(err instanceof Error ? err.message : 'An error occurred')
       } finally {
@@ -642,6 +645,18 @@ export default function LeagueDetailPage() {
         isLoading={isSaving}
         isDangerous
       />
+
+      {showWelcomeModal && (
+        <LeagueWelcomeModal
+          leagueName={league.name}
+          inviteToken={league.invite_token}
+          role={league.role}
+          onComplete={() => {
+            fetch(`/api/leagues/${leagueId}/me`, { method: 'PATCH' }).catch(() => {})
+            setShowWelcomeModal(false)
+          }}
+        />
+      )}
 
       {toast && <Toast message={toast.message} type={toast.type} />}
     </div>

@@ -11,7 +11,7 @@ interface LeagueRecord {
 
 interface MembershipRow {
   joined_at: string
-  leagues: LeagueRecord[]
+  leagues: LeagueRecord | null
 }
 
 type MemberLeague = LeagueHubItem & { joined_at: string }
@@ -62,10 +62,10 @@ export async function getLeaguesHub(
     throw new Error(`Failed to fetch public leagues: ${publicLeaguesResult.error.message}`)
   }
 
-  const memberLeagues: MemberLeague[] = (membershipsResult.data as MembershipRow[])
-    .filter((row) => row.leagues && row.leagues.length > 0)
+  const memberLeagues: MemberLeague[] = (membershipsResult.data as unknown as MembershipRow[])
+    .filter((row) => row.leagues !== null)
     .map((row) => {
-      const league = row.leagues[0]
+      const league = row.leagues as LeagueRecord
       return {
         id: league.id,
         name: league.name,

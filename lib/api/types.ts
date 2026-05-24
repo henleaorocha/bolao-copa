@@ -57,6 +57,8 @@ export interface LeagueDetail extends LeagueSummary {
   description: string | null
   created_by: string
   created_at: string
+  invite_token: string
+  user_onboarded_at: string | null
   members: LeagueMember[]
 }
 
@@ -75,7 +77,7 @@ export interface LeagueMemberWithLeague {
     access_type: 'open' | 'private'
     logo_url: string | null
     member_count: number
-  }[]
+  } | null
 }
 
 export interface LeagueHubItem {

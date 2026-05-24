@@ -60,14 +60,17 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const leagues: LeagueSummary[] = result.data.map((row: LeagueMemberWithLeague) => ({
-      id: row.leagues[0].id,
-      name: row.leagues[0].name,
-      access_type: row.leagues[0].access_type,
-      logo_url: row.leagues[0].logo_url,
-      role: row.role,
-      member_count: row.leagues[0].member_count,
-    }))
+    const rows = result.data as unknown as LeagueMemberWithLeague[]
+    const leagues: LeagueSummary[] = rows
+      .filter((row) => row.leagues !== null)
+      .map((row) => ({
+        id: row.leagues!.id,
+        name: row.leagues!.name,
+        access_type: row.leagues!.access_type,
+        logo_url: row.leagues!.logo_url,
+        role: row.role,
+        member_count: row.leagues!.member_count,
+      }))
 
     const duration = Date.now() - start
     console.log(
@@ -139,10 +142,12 @@ export async function POST(request: NextRequest) {
       name,
       access_type,
       description,
+      prize_pool,
     } = body as {
       name?: unknown
       access_type?: unknown
       description?: unknown
+      prize_pool?: unknown
     }
 
     // Validate name
@@ -185,6 +190,22 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Validate prize_pool (optional)
+    if (prize_pool !== undefined && prize_pool !== null) {
+      if (typeof prize_pool !== 'string') {
+        return NextResponse.json(
+          formatError('INVALID_BODY', 'Premio deve ser texto', 400),
+          { status: 400 }
+        )
+      }
+      if (prize_pool.length > 300) {
+        return NextResponse.json(
+          formatError('INVALID_BODY', 'Premio não pode exceder 300 caracteres', 400),
+          { status: 400 }
+        )
+      }
+    }
+
     // Create the league
     const leagueResult = await supabase
       .from('leagues')
@@ -192,6 +213,7 @@ export async function POST(request: NextRequest) {
         name: trimmedName,
         access_type: access_type as 'open' | 'private',
         description: description && typeof description === 'string' ? description.trim() : null,
+        prize_pool: (prize_pool as string | null | undefined) ?? null,
         created_by: user.id,
       })
       .select('id, name, access_type, logo_url, member_count')
@@ -215,8 +237,6 @@ export async function POST(request: NextRequest) {
         user_id: user.id,
         role: 'admin',
       })
-      .select('role')
-      .single()
 
     if (memberResult.error) {
       console.error('[api/leagues POST] Erro ao adicionar membro admin:', memberResult.error?.message)
@@ -259,7 +279,7 @@ export async function POST(request: NextRequest) {
       name: leagueResult.data.name,
       access_type: leagueResult.data.access_type,
       logo_url: leagueResult.data.logo_url,
-      role: memberResult.data.role,
+      role: 'admin',
       member_count: leagueResult.data.member_count,
     }
 

@@ -2,7 +2,7 @@
 // DASHBOARD — 3 variantes (A: Stats Grid, B: Hero Match, C: Timeline)
 // ─────────────────────────────────────────────────────────────
 
-function DashboardScreen({ palette, leagueName, user, matches, ranking, championBet, variant = 'A', device, onView, onInvite }) {
+function DashboardScreen({ palette, leagueName, user, matches, ranking, championBet, variant = 'A', device, onView, onInvite, prize }) {
   const isMobile = device === 'mobile';
   const upcoming = matches.slice(0, 5);
   const firstMatch = matches[0];
@@ -24,6 +24,9 @@ function DashboardScreen({ palette, leagueName, user, matches, ranking, champion
       <div className={`${isMobile ? 'px-5' : ''} space-y-6`}>
         {/* COUNTDOWN BANNER */}
         <CountdownBanner palette={palette} days={daysToStart} firstMatch={firstMatch}/>
+
+        {/* PRÊMIOS — só aparece se a liga tiver prêmio cadastrado */}
+        {prize && <PrizesCard palette={palette} prize={prize}/>}
 
         {variant === 'A' && <DashboardVariantA palette={palette} myRank={myRank} championBet={championBet}
                                                 matches={upcoming} onView={onView} ranking={ranking} isMobile={isMobile}/>}

@@ -98,8 +98,46 @@ describe('League API validation', () => {
     })
   })
 
+  describe('prize_pool validation', () => {
+    const validatePrizePool = (value: unknown): { valid: boolean; error?: string } => {
+      if (value === undefined || value === null) return { valid: true }
+      if (typeof value !== 'string') return { valid: false, error: 'Premio deve ser texto' }
+      if (value.length > 300) return { valid: false, error: 'Premio não pode exceder 300 caracteres' }
+      return { valid: true }
+    }
+
+    it('accepts prize_pool omitted (undefined)', () => {
+      expect(validatePrizePool(undefined)).toMatchObject({ valid: true })
+    })
+
+    it('accepts prize_pool: null explicitly', () => {
+      expect(validatePrizePool(null)).toMatchObject({ valid: true })
+    })
+
+    it('accepts prize_pool with exactly 300 characters', () => {
+      expect(validatePrizePool('A'.repeat(300))).toMatchObject({ valid: true })
+    })
+
+    it('rejects prize_pool with 301 characters', () => {
+      const result = validatePrizePool('A'.repeat(301))
+      expect(result.valid).toBe(false)
+      expect(result.error).toBe('Premio não pode exceder 300 caracteres')
+    })
+
+    it('rejects prize_pool of non-string type (number)', () => {
+      const result = validatePrizePool(123)
+      expect(result.valid).toBe(false)
+      expect(result.error).toBe('Premio deve ser texto')
+    })
+
+    it('rejects prize_pool of non-string type (object)', () => {
+      const result = validatePrizePool({ value: 'test' })
+      expect(result.valid).toBe(false)
+    })
+  })
+
   describe('LeagueSummary response structure', () => {
-    it('contains required fields and excludes invite_token', () => {
+    it('contains required fields and excludes invite_token and prize_pool', () => {
       const mockLeagueSummary = {
         id: '550e8400-e29b-41d4-a716-446655440000',
         name: 'Test League',
@@ -117,8 +155,9 @@ describe('League API validation', () => {
       expect(mockLeagueSummary).toHaveProperty('role')
       expect(mockLeagueSummary).toHaveProperty('member_count')
 
-      // Verify invite_token is not present
+      // Verify invite_token and prize_pool are not present in response
       expect(mockLeagueSummary).not.toHaveProperty('invite_token')
+      expect(mockLeagueSummary).not.toHaveProperty('prize_pool')
     })
 
     it('validates access_type field values', () => {

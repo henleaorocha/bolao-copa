@@ -7,27 +7,20 @@ function BolaoApp({
   forceView = null,        // override: 'login' | 'leagues' | 'dashboard' | 'matches' | ...
   forceModal = null,       // 'rules' | 'invite' | 'create-league' | null
   forceVariant = {},       // { dashboard: 'A'|'B'|'C', matches: 'A'|'B' }
-  device = 'desktop',      // 'desktop' | 'mobile'
+  device: deviceProp,      // 'desktop' | 'mobile' — quando definido, sobrescreve o tweak
   palette: paletteOverride,
   leagueName: leagueNameOverride,
   initialUser,
   initialChampionBet,
   embedded = false,        // se true, evita postMessages para parent (uso em canvas)
 }) {
-  // Tweaks padrão (apenas se não embarcado)
-  const defaultPalette = paletteOverride || {
-    primary: '#FFC72C',     // amarelo destaque
-    secondary: '#0097A9',   // turquesa
-    dark: '#244C5A',        // azul petróleo
-  };
-  const defaultLeagueName = leagueNameOverride || 'Bolão Principal';
-
   // Estado real (com tweaks)
   const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
     "leagueName": "Bolão Principal",
     "primary": "#FFC72C",
     "secondary": "#0097A9",
-    "dark": "#244C5A"
+    "dark": "#244C5A",
+    "device": "desktop"
   }/*EDITMODE-END*/;
   const [tweaks, setTweak] = window.useTweaks
     ? window.useTweaks(TWEAK_DEFAULTS)
@@ -37,6 +30,8 @@ function BolaoApp({
     primary: tweaks.primary, secondary: tweaks.secondary, dark: tweaks.dark,
   };
   const leagueName = leagueNameOverride || tweaks.leagueName;
+  // Device: prop explícito (canvas) ganha; senão, segue o tweak.
+  const device = deviceProp || tweaks.device || 'desktop';
 
   // ─── State ───────────────────────────────────────────────
   const [view, setView] = React.useState(forceView || 'login');
@@ -47,6 +42,7 @@ function BolaoApp({
   });
   const [currentLeague, setCurrentLeague] = React.useState(forceView && forceView !== 'login' && forceView !== 'leagues' ? window.MOCK_LEAGUES[0] : null);
   const [hasSeenRules, setHasSeenRules] = React.useState(false);
+  const [rulesShowInvite, setRulesShowInvite] = React.useState(false);
   const [predictions, setPredictions] = React.useState({});
   const [championBet, setChampionBet] = React.useState(initialChampionBet || null);
   const [matchDetail, setMatchDetail] = React.useState(null);
@@ -57,7 +53,7 @@ function BolaoApp({
   };
   const handleSelectLeague = (league) => {
     setCurrentLeague(league);
-    if (!hasSeenRules) { setModal('rules'); }
+    if (!hasSeenRules) { setRulesShowInvite(false); setModal('rules'); }
     else { setView('dashboard'); }
   };
   const handleAcceptRules = () => {
@@ -67,7 +63,6 @@ function BolaoApp({
     else setView('dashboard');
   };
   const handleCreateLeague = (data) => {
-    // data: { name, access, logo, prize }
     const payload = typeof data === 'string' ? { name: data } : (data || {});
     const newLeague = {
       id: Date.now(),
@@ -78,6 +73,7 @@ function BolaoApp({
       prize: payload.prize || null,
     };
     setCurrentLeague(newLeague);
+    setRulesShowInvite(true);
     setModal('rules');
   };
   const handleSaveChampionBet = (bet) => {
@@ -98,112 +94,201 @@ function BolaoApp({
     setPredictions(prev => ({ ...prev, [id]: value }));
   };
 
-  // ─── Pre-app views (login, leagues, champion-bet) ───────
-  if (view === 'login') {
-    return (
-      <LoginContainer embedded={embedded} palette={palette}>
+  // ─── Render principal: monta o conteúdo da view, depois decide invólucro ──
+  const renderContent = () => {
+    if (view === 'login') {
+      return (
         <LoginScreen palette={palette} leagueName={leagueName} onLogin={handleLogin} device={device}/>
-        {!embedded && <TweaksUI palette={palette} tweaks={tweaks} setTweak={setTweak}/>}
-      </LoginContainer>
-    );
-  }
-
-  if (view === 'leagues') {
-    return (
-      <>
-        <LeaguesScreen palette={palette} user={user} leagues={window.MOCK_LEAGUES}
-                       onSelectLeague={handleSelectLeague} onCreateLeague={handleCreateLeague}
-                       onLogout={handleLogout} device={device}/>
-        {modal === 'rules' && <RulesModal palette={palette} leagueName={currentLeague?.name || leagueName}
-                                          onAccept={handleAcceptRules} scoringBreakdown={window.SCORING_BREAKDOWN}/>}
-        {!embedded && <TweaksUI palette={palette} tweaks={tweaks} setTweak={setTweak}/>}
-      </>
-    );
-  }
-
-  if (view === 'champion-bet') {
-    return (
-      <>
+      );
+    }
+    if (view === 'leagues') {
+      return (
+        <>
+          <LeaguesScreen palette={palette} user={user} leagues={window.MOCK_LEAGUES}
+                         onSelectLeague={handleSelectLeague} onCreateLeague={handleCreateLeague}
+                         onLogout={handleLogout} device={device}/>
+          {modal === 'rules' && <RulesModal palette={palette} leagueName={currentLeague?.name || leagueName}
+                                            onAccept={handleAcceptRules} scoringBreakdown={window.SCORING_BREAKDOWN}
+                                            showInvite={rulesShowInvite}/>}
+        </>
+      );
+    }
+    if (view === 'champion-bet') {
+      return (
         <ChampionBetScreen palette={palette} candidates={window.TOP_CANDIDATES.slice(0, 12)}
                            initialChampion={championBet?.champion} initialRunnerUp={championBet?.runnerUp}
                            onSave={handleSaveChampionBet} device={device}/>
-        {!embedded && <TweaksUI palette={palette} tweaks={tweaks} setTweak={setTweak}/>}
+      );
+    }
+
+    // Authenticated app — usa shell
+    const screen = (() => {
+      if (view === 'dashboard') {
+        return <DashboardScreen palette={palette} leagueName={currentLeague?.name || leagueName}
+                                user={user} matches={window.MOCK_MATCHES} ranking={window.MOCK_RANKING}
+                                championBet={championBet} variant={forceVariant.dashboard || 'A'}
+                                device={device} onView={navigateView} onInvite={() => setModal('invite')}
+                                prize={currentLeague?.prize}/>;
+      }
+      if (view === 'matches') {
+        return <MatchesScreen palette={palette} matches={window.MOCK_MATCHES} groups={window.MOCK_GROUPS}
+                              predictions={predictions} setPrediction={setOnePrediction}
+                              onView={navigateView} leagueName={currentLeague?.name || leagueName}
+                              variant={forceVariant.matches || 'A'} device={device}
+                              onInvite={() => setModal('invite')} user={user}/>;
+      }
+      if (view === 'table') {
+        return <TableScreen palette={palette} groups={window.MOCK_GROUPS}
+                            leagueName={currentLeague?.name || leagueName} device={device}
+                            onInvite={() => setModal('invite')} user={user}/>;
+      }
+      if (view === 'bracket') {
+        return <BracketScreen palette={palette} bracketRounds={window.BRACKET_ROUNDS}
+                              leagueName={currentLeague?.name || leagueName} device={device}
+                              onInvite={() => setModal('invite')} user={user}/>;
+      }
+      if (view === 'ranking') {
+        return <RankingScreen palette={palette} ranking={window.MOCK_RANKING}
+                              leagueName={currentLeague?.name || leagueName} device={device}
+                              onInvite={() => setModal('invite')} user={user}
+                              prize={currentLeague?.prize}/>;
+      }
+      if (view === 'profile') {
+        return <ProfileScreen palette={palette} user={user} setUser={setUser}
+                              leagueName={currentLeague?.name || leagueName} device={device}
+                              onInvite={() => setModal('invite')} onLogout={handleLogout}/>;
+      }
+      if (view === 'match-detail') {
+        return <MatchDetailScreen palette={palette} match={matchDetail || window.MOCK_MATCHES[0]}
+                                  prediction={predictions[(matchDetail || window.MOCK_MATCHES[0]).id]}
+                                  setPrediction={(p) => setOnePrediction((matchDetail || window.MOCK_MATCHES[0]).id, p)}
+                                  onBack={() => setView('matches')} leagueName={currentLeague?.name || leagueName}
+                                  device={device} onInvite={() => setModal('invite')} user={user}/>;
+      }
+      return null;
+    })();
+
+    return (
+      <>
+        <AppFrame device={device} view={view} setView={(v) => navigateView(v)}
+                  user={user} leagueName={currentLeague?.name || leagueName} palette={palette}
+                  onInvite={() => setModal('invite')} onLogout={handleLogout}>
+          {screen}
+        </AppFrame>
+
+        {modal === 'rules' && (
+          <RulesModal palette={palette} leagueName={currentLeague?.name || leagueName}
+                      onAccept={handleAcceptRules} onClose={() => setModal(null)}
+                      scoringBreakdown={window.SCORING_BREAKDOWN}
+                      showInvite={rulesShowInvite}/>
+        )}
+        {modal === 'invite' && (
+          <InviteModal palette={palette} leagueName={currentLeague?.name || leagueName}
+                       onClose={() => setModal(null)}/>
+        )}
       </>
     );
-  }
+  };
 
-  // ─── Authenticated app (com shell) ───────────────────────
-  const content = (() => {
-    if (view === 'dashboard') {
-      return <DashboardScreen palette={palette} leagueName={currentLeague?.name || leagueName}
-                              user={user} matches={window.MOCK_MATCHES} ranking={window.MOCK_RANKING}
-                              championBet={championBet} variant={forceVariant.dashboard || 'A'}
-                              device={device} onView={navigateView} onInvite={() => setModal('invite')}/>;
-    }
-    if (view === 'matches') {
-      return <MatchesScreen palette={palette} matches={window.MOCK_MATCHES} groups={window.MOCK_GROUPS}
-                            predictions={predictions} setPrediction={setOnePrediction}
-                            onView={navigateView} leagueName={currentLeague?.name || leagueName}
-                            variant={forceVariant.matches || 'A'} device={device}
-                            onInvite={() => setModal('invite')} user={user}/>;
-    }
-    if (view === 'table') {
-      return <TableScreen palette={palette} groups={window.MOCK_GROUPS}
-                          leagueName={currentLeague?.name || leagueName} device={device}
-                          onInvite={() => setModal('invite')} user={user}/>;
-    }
-    if (view === 'bracket') {
-      return <BracketScreen palette={palette} bracketRounds={window.BRACKET_ROUNDS}
-                            leagueName={currentLeague?.name || leagueName} device={device}
-                            onInvite={() => setModal('invite')} user={user}/>;
-    }
-    if (view === 'ranking') {
-      return <RankingScreen palette={palette} ranking={window.MOCK_RANKING}
-                            leagueName={currentLeague?.name || leagueName} device={device}
-                            onInvite={() => setModal('invite')} user={user}/>;
-    }
-    if (view === 'profile') {
-      return <ProfileScreen palette={palette} user={user} setUser={setUser}
-                            leagueName={currentLeague?.name || leagueName} device={device}
-                            onInvite={() => setModal('invite')} onLogout={handleLogout}/>;
-    }
-    if (view === 'match-detail') {
-      return <MatchDetailScreen palette={palette} match={matchDetail || window.MOCK_MATCHES[0]}
-                                prediction={predictions[(matchDetail || window.MOCK_MATCHES[0]).id]}
-                                setPrediction={(p) => setOnePrediction((matchDetail || window.MOCK_MATCHES[0]).id, p)}
-                                onBack={() => setView('matches')} leagueName={currentLeague?.name || leagueName}
-                                device={device} onInvite={() => setModal('invite')} user={user}/>;
-    }
-    return null;
-  })();
+  // Invólucro: se mobile e não embarcado, renderiza dentro de um chassi de iPhone.
+  const wrapped = (!embedded && device === 'mobile')
+    ? <MobileShell palette={palette}>{renderContent()}</MobileShell>
+    : renderContent();
 
   return (
     <>
-      <AppFrame device={device} view={view} setView={(v) => navigateView(v)}
-                user={user} leagueName={currentLeague?.name || leagueName} palette={palette}
-                onInvite={() => setModal('invite')} onLogout={handleLogout}>
-        {content}
-      </AppFrame>
-
-      {/* Modais globais */}
-      {modal === 'rules' && (
-        <RulesModal palette={palette} leagueName={currentLeague?.name || leagueName}
-                    onAccept={handleAcceptRules} onClose={() => setModal(null)}
-                    scoringBreakdown={window.SCORING_BREAKDOWN}/>
-      )}
-      {modal === 'invite' && (
-        <InviteModal palette={palette} leagueName={currentLeague?.name || leagueName}
-                     onClose={() => setModal(null)}/>
-      )}
-
+      {wrapped}
       {!embedded && <TweaksUI palette={palette} tweaks={tweaks} setTweak={setTweak}/>}
     </>
   );
 }
 
-// Wrapper para preservar fundo escuro do login até hidratar
-function LoginContainer({ children, embedded, palette }) {
-  return <>{children}</>;
+// ─── MOBILE SHELL — chassi de iPhone centrado em fundo escuro ────────
+function MobileShell({ children, palette }) {
+  React.useEffect(() => {
+    const prevBg = document.body.style.background;
+    const prevHtmlBg = document.documentElement.style.background;
+    document.body.style.background = '#0b1014';
+    document.documentElement.style.background = '#0b1014';
+    return () => {
+      document.body.style.background = prevBg;
+      document.documentElement.style.background = prevHtmlBg;
+    };
+  }, []);
+
+  // iPhone 14 Pro ≈ 393×852 ; usamos 390×844 que é o tamanho dos artboards do canvas
+  const W = 390, H = 844;
+
+  return (
+    <div style={{
+      minHeight: '100vh',
+      display: 'flex',
+      alignItems: 'flex-start',
+      justifyContent: 'center',
+      padding: '32px 16px 32px',
+      background: '#0b1014',
+    }}>
+      <div style={{
+        position: 'relative',
+        width: W,
+        height: H,
+        borderRadius: 50,
+        overflow: 'hidden',
+        background: '#F6F8FA',
+        // moldura do aparelho (anel preto + outline metálico) + sombra
+        boxShadow: '0 0 0 6px #0a0d11, 0 0 0 7px #1f242b, 0 30px 80px rgba(0,0,0,0.55), 0 10px 30px rgba(0,0,0,0.4)',
+        // cria containing block para descendentes position:fixed (bottom-nav, modais)
+        transform: 'translateZ(0)',
+      }}>
+        {/* Status bar (44px) — sobreposta ao conteúdo */}
+        <div style={{
+          position: 'absolute', top: 0, left: 0, right: 0,
+          height: 44,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '0 32px',
+          zIndex: 70,
+          fontFamily: '-apple-system, system-ui, sans-serif',
+          fontSize: 15, fontWeight: 600,
+          color: '#0a0d11',
+          pointerEvents: 'none',
+        }}>
+          <span style={{ minWidth: 50, letterSpacing: '-0.02em' }}>9:41</span>
+          <span style={{ minWidth: 110 }}/>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 50, justifyContent: 'flex-end' }}>
+            {/* signal */}
+            <svg width="17" height="11" viewBox="0 0 17 11" fill="currentColor"><rect x="0" y="7" width="3" height="4" rx="0.5"/><rect x="4.5" y="5" width="3" height="6" rx="0.5"/><rect x="9" y="2.5" width="3" height="8.5" rx="0.5"/><rect x="13.5" y="0" width="3" height="11" rx="0.5"/></svg>
+            {/* battery */}
+            <svg width="25" height="11" viewBox="0 0 25 11"><rect x="0.5" y="0.5" width="21" height="10" rx="2.5" fill="none" stroke="currentColor" strokeOpacity="0.4"/><rect x="22.5" y="3.5" width="1.5" height="4" rx="0.5" fill="currentColor" fillOpacity="0.4"/><rect x="2" y="2" width="18" height="7" rx="1.5" fill="currentColor"/></svg>
+          </span>
+        </div>
+
+        {/* Dynamic island */}
+        <div style={{
+          position: 'absolute', top: 10, left: '50%', transform: 'translateX(-50%)',
+          width: 118, height: 34, borderRadius: 20, background: '#000', zIndex: 80,
+          pointerEvents: 'none',
+        }}/>
+
+        {/* Scrollable canvas */}
+        <div style={{
+          position: 'absolute',
+          top: 0, left: 0, right: 0, bottom: 0,
+          overflowY: 'auto', overflowX: 'hidden',
+          paddingTop: 44, // empurra conteúdo abaixo da status bar
+        }}>
+          {children}
+        </div>
+
+        {/* Home indicator */}
+        <div style={{
+          position: 'absolute', bottom: 6, left: '50%', transform: 'translateX(-50%)',
+          width: 134, height: 5, borderRadius: 100,
+          background: 'rgba(10,13,17,0.35)',
+          zIndex: 90, pointerEvents: 'none',
+        }}/>
+      </div>
+    </div>
+  );
 }
 
 // ─── TWEAKS UI ──────────────────────────────────────────────
@@ -211,6 +296,14 @@ function TweaksUI({ palette, tweaks, setTweak }) {
   if (!window.TweaksPanel) return null;
   return (
     <window.TweaksPanel title="Tweaks">
+      <window.TweakSection label="Visualização"/>
+      <window.TweakRadio label="Dispositivo" value={tweaks.device || 'desktop'}
+        options={[
+          { value: 'desktop', label: 'Desktop' },
+          { value: 'mobile',  label: 'Mobile' },
+        ]}
+        onChange={(v) => setTweak('device', v)}/>
+
       <window.TweakSection label="Identidade"/>
       <window.TweakText label="Nome do bolão" value={tweaks.leagueName}
                         onChange={(v) => setTweak('leagueName', v)}/>
@@ -241,4 +334,4 @@ function TweaksUI({ palette, tweaks, setTweak }) {
   );
 }
 
-Object.assign(window, { BolaoApp, TweaksUI });
+Object.assign(window, { BolaoApp, TweaksUI, MobileShell });

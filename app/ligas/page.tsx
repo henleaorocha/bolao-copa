@@ -7,6 +7,7 @@ import { getDaysUntilCopa } from '@/lib/leagues/get-days-until-copa'
 import type { CopaCountdown } from '@/lib/leagues/get-days-until-copa'
 import LeagueCard from '@/components/LeagueCard'
 import LogoutButton from '@/components/LogoutButton'
+import CreateLeagueModal from '@/components/CreateLeagueModal'
 
 function CountdownBanner({ countdown }: { countdown: CopaCountdown }) {
   return (
@@ -97,17 +98,7 @@ export default async function LigasPage() {
               <LeagueCard key={league.id} league={league} />
             ))}
 
-            {/* "Criar nova liga" — visual-only dashed card, no click handler this phase */}
-            <div
-              data-testid="create-league-card"
-              className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-[#0097A9]/40 bg-white/80 p-8 text-center"
-            >
-              <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#0097A9] text-2xl font-bold text-white">
-                +
-              </div>
-              <p className="font-bold text-gray-800">Criar nova liga</p>
-              <p className="mt-1 text-sm text-gray-500">Convide amigos de fora também</p>
-            </div>
+            <CreateLeagueModal />
           </div>
         </div>
       </section>

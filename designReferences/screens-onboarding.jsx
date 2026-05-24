@@ -322,9 +322,13 @@ function CreateLeagueModal({ palette, onClose, onCreate }) {
 }
 
 // ── RULES MODAL ──────────────────────────────────────────────
-function RulesModal({ palette, leagueName, onAccept, onClose, scoringBreakdown }) {
+function RulesModal({ palette, leagueName, onAccept, onClose, scoringBreakdown, showInvite = false }) {
   const [step, setStep] = React.useState(0);
-  const steps = [
+  const [copied, setCopied] = React.useState(false);
+  const inviteLink = `bolaocopa.app/i/${(leagueName || 'liga').toLowerCase().replace(/\s+/g, '-').slice(0, 24)}`;
+  const copyInvite = () => { setCopied(true); setTimeout(() => setCopied(false), 2000); };
+
+  const baseSteps = [
   {
     icon: 'sparkles',
     title: `Bem-vindo ao ${leagueName}!`,
@@ -343,6 +347,17 @@ function RulesModal({ palette, leagueName, onAccept, onClose, scoringBreakdown }
     kicker: 'Pontuação',
     body: null // renderizado abaixo
   }];
+
+  const inviteStep = {
+    icon: 'share',
+    title: 'Chama a galera pra jogar',
+    kicker: 'Convide agora',
+    body: null // renderizado abaixo
+  };
+
+  const steps = showInvite ? [...baseSteps, inviteStep] : baseSteps;
+  const lastStep = steps.length - 1;
+  const inviteStepIndex = showInvite ? steps.length - 1 : -1;
 
   const s = steps[step];
   return (
@@ -402,6 +417,49 @@ function RulesModal({ palette, leagueName, onAccept, onClose, scoringBreakdown }
               </div>
             </div>
           }
+          {step === inviteStepIndex &&
+          <div className="space-y-4">
+              <p className="text-slate-600 leading-relaxed">
+                Sua liga foi criada! Bolão fica mais divertido com gente — manda o link pros amigos, família ou o time todo entrarem em <b>{leagueName}</b>.
+              </p>
+
+              {/* Link copy */}
+              <div className="bg-slate-50 rounded-2xl p-4 flex items-center gap-3">
+                <Icon name="link" size={18} style={{ color: palette.secondary }} />
+                <span className="flex-1 text-sm font-mono truncate" style={{ color: palette.dark }}>{inviteLink}</span>
+                <button onClick={copyInvite}
+                  className="px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-2 shrink-0 transition"
+                  style={{ background: copied ? '#16A34A' : palette.dark, color: 'white' }}>
+                  {copied ?
+                    <><Icon name="check" size={12} /> Copiado</> :
+                    <><Icon name="copy" size={12} /> Copiar</>}
+                </button>
+              </div>
+
+              {/* Share botões */}
+              <div className="grid grid-cols-3 gap-3">
+                {[
+                  { icon: 'whatsapp', label: 'WhatsApp', color: '#25D366' },
+                  { icon: 'qrCode', label: 'QR Code', color: palette.secondary },
+                  { icon: 'share', label: 'Mais', color: palette.dark }
+                ].map((b, i) =>
+                  <button key={i} className="p-3 rounded-2xl bg-slate-50 hover:bg-slate-100 transition flex flex-col items-center gap-2">
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white"
+                      style={{ background: b.color }}>
+                      <Icon name={b.icon} size={18} />
+                    </div>
+                    <span className="text-[11px] font-bold" style={{ color: palette.dark }}>{b.label}</span>
+                  </button>
+                )}
+              </div>
+
+              <div className="p-3 rounded-2xl text-xs flex items-start gap-2"
+                style={{ background: `${palette.primary}15`, color: palette.dark }}>
+                <Icon name="users" size={14} className="shrink-0 mt-0.5" />
+                <span>Você também pode convidar depois pelo botão <b>Convidar</b> no topo da liga.</span>
+              </div>
+            </div>
+          }
         </div>
 
         {/* Footer */}
@@ -411,17 +469,17 @@ function RulesModal({ palette, leagueName, onAccept, onClose, scoringBreakdown }
               <Icon name="chevronLeft" size={16} /> Voltar
             </button>
           }
-          {step < 2 ?
+          {step < lastStep ?
           <button onClick={() => setStep(step + 1)}
           className="flex-1 py-4 rounded-2xl font-black shadow-lg hover:scale-[1.02] transition flex items-center justify-center gap-2"
           style={{ background: palette.primary, color: palette.dark }}>
-              Próximo <Icon name="arrowRight" size={18} />
+              {step === lastStep - 1 && showInvite ? 'Convidar amigos' : 'Próximo'} <Icon name="arrowRight" size={18} />
             </button> :
 
           <button onClick={onAccept}
           className="flex-1 py-4 rounded-2xl font-black shadow-lg hover:scale-[1.02] transition flex items-center justify-center gap-2"
           style={{ background: palette.primary, color: palette.dark }}>
-              Bora jogar! <Icon name="zap" size={18} />
+              {step === inviteStepIndex ? 'Pronto, bora jogar!' : 'Bora jogar!'} <Icon name="zap" size={18} />
             </button>
           }
         </div>

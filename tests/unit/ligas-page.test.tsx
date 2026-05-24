@@ -40,6 +40,12 @@ vi.mock('@/components/LeagueCard', () => ({
   ),
 }))
 
+vi.mock('@/components/CreateLeagueModal', () => ({
+  default: () => (
+    <button data-testid="create-league-card">Criar nova liga</button>
+  ),
+}))
+
 // ── Lazy import AFTER mocks are registered ────────────────────────────────
 
 import LigasPage from '@/app/ligas/page'
@@ -175,15 +181,11 @@ describe('LigasPage — async Server Component', () => {
 
   // ── "Criar nova liga" card ──────────────────────────────────────────────
 
-  it('renders the "Criar nova liga" card as a <div> with no onclick handler', async () => {
+  it('renders the "Criar nova liga" card via <CreateLeagueModal />', async () => {
     const ui = await LigasPage()
     render(ui)
 
-    const createCard = screen.getByTestId('create-league-card')
-    expect(createCard).toBeInTheDocument()
-    expect(createCard.tagName).toBe('DIV')
-    // No interactive handler wired in this phase
-    expect(createCard.onclick).toBeNull()
+    expect(screen.getByTestId('create-league-card')).toBeInTheDocument()
   })
 
   it('"Criar nova liga" card is always rendered regardless of league count', async () => {

@@ -142,7 +142,7 @@ function PlaceholderTeam({ label, palette }) {
 }
 
 // ── RANKING ──────────────────────────────────────────────────
-function RankingScreen({ palette, ranking, leagueName, device, onInvite, user }) {
+function RankingScreen({ palette, ranking, leagueName, device, onInvite, user, prize }) {
   const isMobile = device === 'mobile';
   const top3 = ranking.slice(0, 3);
   const rest = ranking.slice(3);
@@ -165,6 +165,13 @@ function RankingScreen({ palette, ranking, leagueName, device, onInvite, user })
       <div className={isMobile ? 'px-5' : ''}>
         {/* Pódio Top 3 */}
         <Podium palette={palette} top3={top3} isMobile={isMobile}/>
+
+        {/* PRÊMIOS — só aparece se a liga tiver prêmio cadastrado */}
+        {prize && (
+          <div className="mt-6">
+            <PrizesCard palette={palette} prize={prize}/>
+          </div>
+        )}
 
         {/* Sua posição destacada */}
         {myRank && (

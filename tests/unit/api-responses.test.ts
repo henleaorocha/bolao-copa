@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { formatSuccess, formatError } from '@/lib/api/responses'
+import type { LeagueDetail, LeagueSummary, LeagueMember } from '@/lib/api/types'
 
 describe('formatSuccess', () => {
   it('returns envelope with status success', () => {
@@ -73,5 +74,79 @@ describe('formatError', () => {
     const res = formatError('DATABASE_UNAVAILABLE', 'Banco de dados indisponível', 503)
     expect(res.code).toBe('DATABASE_UNAVAILABLE')
     expect(res.statusCode).toBe(503)
+  })
+})
+
+describe('LeagueDetail type shape', () => {
+  const leagueDetailFixture = {
+    id: 'league-1',
+    name: 'Test League',
+    access_type: 'private',
+    logo_url: null,
+    role: 'admin',
+    member_count: 1,
+    description: null,
+    created_by: 'user-1',
+    created_at: '2026-01-01T00:00:00Z',
+    invite_token: 'tok-abc123',
+    user_onboarded_at: null,
+    members: [],
+  } satisfies LeagueDetail
+
+  it('includes invite_token field', () => {
+    expect(leagueDetailFixture).toHaveProperty('invite_token')
+    expect(typeof leagueDetailFixture.invite_token).toBe('string')
+  })
+
+  it('includes user_onboarded_at field as string or null', () => {
+    expect(leagueDetailFixture).toHaveProperty('user_onboarded_at')
+    const val = leagueDetailFixture.user_onboarded_at
+    expect(val === null || typeof val === 'string').toBe(true)
+  })
+
+  it('accepts a non-null user_onboarded_at timestamp', () => {
+    const withTimestamp = {
+      ...leagueDetailFixture,
+      user_onboarded_at: '2026-05-23T10:00:00Z',
+    } satisfies LeagueDetail
+    expect(typeof withTimestamp.user_onboarded_at).toBe('string')
+  })
+})
+
+describe('LeagueSummary type shape (regression)', () => {
+  const summaryFixture = {
+    id: 'league-1',
+    name: 'Test League',
+    access_type: 'open',
+    logo_url: null,
+    role: 'member',
+    member_count: 5,
+  } satisfies LeagueSummary
+
+  it('does not include invite_token', () => {
+    expect(summaryFixture).not.toHaveProperty('invite_token')
+  })
+
+  it('does not include user_onboarded_at', () => {
+    expect(summaryFixture).not.toHaveProperty('user_onboarded_at')
+  })
+})
+
+describe('LeagueMember type shape (regression)', () => {
+  const memberFixture = {
+    user_id: 'user-1',
+    full_name: 'João',
+    avatar_url: null,
+    avatar_color: '#FF0000',
+    role: 'member',
+    joined_at: '2026-01-01T00:00:00Z',
+  } satisfies LeagueMember
+
+  it('does not include invite_token', () => {
+    expect(memberFixture).not.toHaveProperty('invite_token')
+  })
+
+  it('does not include user_onboarded_at', () => {
+    expect(memberFixture).not.toHaveProperty('user_onboarded_at')
   })
 })

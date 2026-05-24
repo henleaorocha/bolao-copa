@@ -11,6 +11,14 @@ import { useLeague } from '@/lib/league-context'
 vi.mock('next/navigation')
 vi.mock('@/lib/league-context')
 
+vi.mock('@/components/LeagueWelcomeModal', () => ({
+  default: ({ onComplete }: { onComplete: () => void }) => (
+    <div data-testid="welcome-modal">
+      <button data-testid="complete-button" onClick={onComplete}>Complete</button>
+    </div>
+  ),
+}))
+
 const mockLeague = {
   id: 'league-123',
   name: 'Bolão da Família',
@@ -21,6 +29,8 @@ const mockLeague = {
   member_count: 3,
   created_by: 'user-admin-id',
   created_at: '2026-01-01T00:00:00Z',
+  invite_token: 'tok-abc123',
+  user_onboarded_at: '2026-05-23T10:00:00Z',
   members: [
     {
       user_id: 'user-admin-id',
@@ -793,6 +803,74 @@ describe('LeagueDetailPage', () => {
         // The toast message indicates successful update
         expect(screen.getByText('Liga atualizada com sucesso!')).toBeInTheDocument()
       })
+    })
+  })
+
+  describe('LeagueWelcomeModal Integration', () => {
+    function makeLeagueFetch(overrides: Record<string, unknown> = {}) {
+      return fetchSpy.mockImplementation((url: string | Request) => {
+        const urlStr = typeof url === 'string' ? url : url.url
+        if (urlStr.includes('/api/auth/me')) {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({ data: { user: { id: 'user-admin-id' } } }),
+          } as Response)
+        }
+        if (urlStr.includes('/api/leagues/league-123')) {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({ data: { ...mockLeague, ...overrides } }),
+          } as Response)
+        }
+        return Promise.reject(new Error('Unknown URL'))
+      })
+    }
+
+    it('renders LeagueWelcomeModal when user_onboarded_at is null', async () => {
+      makeLeagueFetch({ user_onboarded_at: null })
+      render(<LeagueDetailPage />)
+
+      await waitFor(() => {
+        expect(screen.getByTestId('welcome-modal')).toBeInTheDocument()
+      })
+    })
+
+    it('does not render LeagueWelcomeModal when user_onboarded_at is a non-null string', async () => {
+      makeLeagueFetch({ user_onboarded_at: '2026-05-23T10:00:00Z' })
+      render(<LeagueDetailPage />)
+
+      await waitFor(() => {
+        expect(screen.getByText('Bolão da Família')).toBeInTheDocument()
+      })
+      expect(screen.queryByTestId('welcome-modal')).not.toBeInTheDocument()
+    })
+
+    it('removes LeagueWelcomeModal from DOM when onComplete fires without re-fetching', async () => {
+      const user = userEvent.setup()
+      makeLeagueFetch({ user_onboarded_at: null })
+      render(<LeagueDetailPage />)
+
+      await waitFor(() => {
+        expect(screen.getByTestId('welcome-modal')).toBeInTheDocument()
+      })
+
+      const callCountBefore = fetchSpy.mock.calls.length
+      await user.click(screen.getByTestId('complete-button'))
+
+      await waitFor(() => {
+        expect(screen.queryByTestId('welcome-modal')).not.toBeInTheDocument()
+      })
+      expect(screen.getByText('Bolão da Família')).toBeInTheDocument()
+      expect(fetchSpy.mock.calls.length).toBe(callCountBefore)
+    })
+
+    it('does not render LeagueWelcomeModal during the loading state', () => {
+      fetchSpy.mockImplementation(() => new Promise(() => {}))
+
+      render(<LeagueDetailPage />)
+
+      expect(screen.queryByTestId('welcome-modal')).not.toBeInTheDocument()
+      expect(screen.getByText('Carregando...')).toBeInTheDocument()
     })
   })
 

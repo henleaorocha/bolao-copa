@@ -242,7 +242,85 @@ function PhaseStripe({ phase, palette, multiplier }) {
   );
 }
 
+// PrizesCard — exibe os prêmios cadastrados pelo criador da liga
+function PrizesCard({ palette, prize, compact = false }) {
+  if (!prize || !prize.trim()) return null;
+
+  // Quebra por " · ", " | " ou nova linha. Cada item é uma linha de prêmio.
+  const items = prize.split(/\s*(?:·|\||\n)\s*/).map(s => s.trim()).filter(Boolean);
+
+  // Tenta extrair rank ("1º", "2º", "3º", "1°", "1 -", "1.") do início do texto.
+  const parseItem = (raw, fallbackIdx) => {
+    const m = raw.match(/^\s*(\d+)\s*[ºo°.\-–—)]?\s*[—–\-:|·]?\s*(.*)$/i);
+    if (m && parseInt(m[1], 10) >= 1 && parseInt(m[1], 10) <= 20) {
+      const rank = parseInt(m[1], 10);
+      const text = (m[2] || '').trim() || raw;
+      return { rank, text };
+    }
+    return { rank: items.length > 1 ? fallbackIdx + 1 : null, text: raw };
+  };
+
+  const rankColor = (r) => r === 1 ? palette.primary : r === 2 ? '#CBD5E1' : r === 3 ? '#FB923C' : '#E2E8F0';
+  const rankFg = (r) => r === 1 ? palette.dark : r === 2 ? '#475569' : r === 3 ? 'white' : '#64748B';
+  const rankIcon = (r) => r === 1 ? 'crown' : r === 2 ? 'medal' : r === 3 ? 'medal' : 'award';
+
+  return (
+    <div className="rounded-[28px] overflow-hidden border shadow-sm relative"
+         style={{ background: 'white', borderColor: `${palette.primary}40` }}>
+      {/* Faixa decorativa superior */}
+      <div className="px-6 pt-5 pb-4 relative overflow-hidden"
+           style={{ background: `linear-gradient(135deg, ${palette.primary}25 0%, ${palette.primary}08 100%)` }}>
+        <div className="absolute -top-10 -right-10 w-32 h-32 rounded-full opacity-20 blur-2xl"
+             style={{ background: palette.primary }}></div>
+        <div className="relative z-10 flex items-center gap-3">
+          <div className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 shadow-sm"
+               style={{ background: palette.primary, color: palette.dark }}>
+            <Icon name="award" size={22} strokeWidth={2.5}/>
+          </div>
+          <div className="min-w-0">
+            <div className="text-[10px] font-black uppercase tracking-[0.2em]"
+                 style={{ color: palette.secondary }}>Prêmios da liga</div>
+            <div className="text-base font-black leading-tight" style={{ color: palette.dark }}>
+              O que está em jogo
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className={`p-${compact ? '4' : '5'} space-y-2`}>
+        {items.map((raw, i) => {
+          const { rank, text } = parseItem(raw, i);
+          return (
+            <div key={i} className="flex items-center gap-3 p-3 rounded-2xl bg-slate-50">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center font-black text-xs shrink-0 shadow-sm"
+                   style={{ background: rankColor(rank), color: rankFg(rank) }}>
+                {rank ? (
+                  <div className="flex items-center gap-1">
+                    <Icon name={rankIcon(rank)} size={12} strokeWidth={2.5}/>
+                    <span>{rank}º</span>
+                  </div>
+                ) : (
+                  <Icon name="award" size={14} strokeWidth={2.5}/>
+                )}
+              </div>
+              <div className="flex-1 min-w-0 text-sm font-bold leading-snug"
+                   style={{ color: palette.dark }}>
+                {text}
+              </div>
+            </div>
+          );
+        })}
+
+        <div className="pt-1 px-1 text-[11px] text-slate-400 flex items-center gap-1.5">
+          <Icon name="user" size={11}/>
+          <span>Definido pelo criador da liga</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 Object.assign(window, {
   Sidebar, Topbar, MobileTopbar, BottomNav, AppFrame,
-  Card, Badge, GroupBadge, PhaseStripe, NAV_ITEMS,
+  Card, Badge, GroupBadge, PhaseStripe, PrizesCard, NAV_ITEMS,
 });
