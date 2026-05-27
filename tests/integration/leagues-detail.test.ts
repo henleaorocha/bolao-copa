@@ -151,6 +151,73 @@ describe.skipIf(!HAS_SERVICE_KEY)('League detail endpoints (GET, PATCH, DELETE)'
       expect(json.status).toBe('success')
       expect(json.data.id).toBe(testLeagueId)
     })
+
+    it('returns prizes, user_stats, and ranking fields in the response', async () => {
+      const res = await fetch(`${BASE_URL}/api/leagues/${testLeagueId}`, {
+        headers: { Cookie: `sb-access-token=${adminSession.access_token}` },
+      })
+      expect(res.status).toBe(200)
+      const json = await res.json()
+      expect(json.status).toBe('success')
+
+      // prizes: present and null or string
+      expect(json.data).toHaveProperty('prizes')
+      expect(json.data.prizes === null || typeof json.data.prizes === 'string').toBe(true)
+
+      // user_stats: stub zeros
+      expect(json.data).toHaveProperty('user_stats')
+      expect(json.data.user_stats).toEqual({
+        position: 0,
+        points: 0,
+        guesses_made: 0,
+        guesses_total: 0,
+        exact_scores: 0,
+      })
+
+      // ranking: array, ≤5 entries, each with points: 0 and 1-based position
+      expect(json.data).toHaveProperty('ranking')
+      expect(Array.isArray(json.data.ranking)).toBe(true)
+      expect(json.data.ranking.length).toBeLessThanOrEqual(5)
+      json.data.ranking.forEach((entry: { points: number; position: number }, i: number) => {
+        expect(entry.points).toBe(0)
+        expect(entry.position).toBe(i + 1)
+      })
+    })
+
+    it('returns has_champion_bet: false when no champion bet exists for the user', async () => {
+      const res = await fetch(`${BASE_URL}/api/leagues/${testLeagueId}`, {
+        headers: { Cookie: `sb-access-token=${adminSession.access_token}` },
+      })
+      expect(res.status).toBe(200)
+      const json = await res.json()
+      expect(json.data).toHaveProperty('has_champion_bet')
+      expect(json.data.has_champion_bet).toBe(false)
+    })
+
+    it('returns has_champion_bet: true after inserting a champion bet row', async () => {
+      const admin = adminClient()
+      await admin.from('champion_bets').insert({
+        user_id: adminId,
+        league_id: testLeagueId,
+        champion_team: 'Brasil',
+        runner_up_team: 'Argentina',
+      })
+
+      try {
+        const res = await fetch(`${BASE_URL}/api/leagues/${testLeagueId}`, {
+          headers: { Cookie: `sb-access-token=${adminSession.access_token}` },
+        })
+        expect(res.status).toBe(200)
+        const json = await res.json()
+        expect(json.data.has_champion_bet).toBe(true)
+      } finally {
+        await admin
+          .from('champion_bets')
+          .delete()
+          .eq('user_id', adminId)
+          .eq('league_id', testLeagueId)
+      }
+    })
   })
 
   describe('PATCH /api/leagues/[id]', () => {

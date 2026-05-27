@@ -48,7 +48,7 @@ export default function LeagueCard({ league }: LeagueCardProps) {
   const shieldColor = getShieldColor(league.name)
 
   return (
-    <div className="flex flex-col rounded-xl bg-white p-4 shadow-sm">
+    <div className="flex flex-col h-full rounded-xl bg-white p-4 shadow-sm">
       <div className="flex items-start gap-3">
         <div
           data-testid="league-shield"

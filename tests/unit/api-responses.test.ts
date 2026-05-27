@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { formatSuccess, formatError } from '@/lib/api/responses'
-import type { LeagueDetail, LeagueSummary, LeagueMember } from '@/lib/api/types'
+import type { LeagueDetail, LeagueSummary, LeagueMember, UserStats, RankingEntry } from '@/lib/api/types'
 
 describe('formatSuccess', () => {
   it('returns envelope with status success', () => {
@@ -91,6 +91,11 @@ describe('LeagueDetail type shape', () => {
     invite_token: 'tok-abc123',
     user_onboarded_at: null,
     members: [],
+    has_champion_bet: false,
+    champion_bet: null,
+    prizes: null,
+    user_stats: { position: 0, points: 0, guesses_made: 0, guesses_total: 0, exact_scores: 0 },
+    ranking: [],
   } satisfies LeagueDetail
 
   it('includes invite_token field', () => {
@@ -148,5 +153,125 @@ describe('LeagueMember type shape (regression)', () => {
 
   it('does not include user_onboarded_at', () => {
     expect(memberFixture).not.toHaveProperty('user_onboarded_at')
+  })
+})
+
+describe('UserStats type shape', () => {
+  it('accepts all-zero values', () => {
+    const stats = {
+      position: 0,
+      points: 0,
+      guesses_made: 0,
+      guesses_total: 0,
+      exact_scores: 0,
+    } satisfies UserStats
+    expect(stats.position).toBe(0)
+    expect(stats.points).toBe(0)
+    expect(stats.guesses_made).toBe(0)
+    expect(stats.guesses_total).toBe(0)
+    expect(stats.exact_scores).toBe(0)
+  })
+
+  it('accepts non-zero values', () => {
+    const stats = {
+      position: 3,
+      points: 42,
+      guesses_made: 10,
+      guesses_total: 20,
+      exact_scores: 2,
+    } satisfies UserStats
+    expect(stats.position).toBe(3)
+    expect(stats.points).toBe(42)
+  })
+})
+
+describe('RankingEntry type shape', () => {
+  it('accepts full_name: null (nullable field)', () => {
+    const entry = {
+      user_id: 'user-1',
+      full_name: null,
+      avatar_color: '#FF0000',
+      points: 0,
+      position: 1,
+    } satisfies RankingEntry
+    expect(entry.full_name).toBeNull()
+  })
+
+  it('accepts full_name as string', () => {
+    const entry = {
+      user_id: 'user-1',
+      full_name: 'Maria Silva',
+      avatar_color: '#0097A9',
+      points: 0,
+      position: 1,
+    } satisfies RankingEntry
+    expect(entry.full_name).toBe('Maria Silva')
+  })
+
+  it('includes all required fields', () => {
+    const entry = {
+      user_id: 'user-2',
+      full_name: null,
+      avatar_color: '#244C5A',
+      points: 10,
+      position: 2,
+    } satisfies RankingEntry
+    expect(entry).toHaveProperty('user_id')
+    expect(entry).toHaveProperty('full_name')
+    expect(entry).toHaveProperty('avatar_color')
+    expect(entry).toHaveProperty('points')
+    expect(entry).toHaveProperty('position')
+  })
+})
+
+describe('LeagueDetail extended type shape', () => {
+  it('accepts prizes: null', () => {
+    const detail = {
+      id: 'league-1',
+      name: 'Test League',
+      access_type: 'private' as const,
+      logo_url: null,
+      role: 'admin' as const,
+      member_count: 1,
+      description: null,
+      created_by: 'user-1',
+      created_at: '2026-01-01T00:00:00Z',
+      invite_token: 'tok-abc',
+      user_onboarded_at: null,
+      members: [],
+      has_champion_bet: false,
+      champion_bet: null,
+      prizes: null,
+      user_stats: { position: 0, points: 0, guesses_made: 0, guesses_total: 0, exact_scores: 0 },
+      ranking: [],
+    } satisfies LeagueDetail
+    expect(detail.prizes).toBeNull()
+  })
+
+  it('accepts all three new fields assigned with valid values', () => {
+    const detail = {
+      id: 'league-2',
+      name: 'Prêmios Liga',
+      access_type: 'open' as const,
+      logo_url: null,
+      role: 'member' as const,
+      member_count: 3,
+      description: 'Com prêmios',
+      created_by: 'user-1',
+      created_at: '2026-01-01T00:00:00Z',
+      invite_token: 'tok-xyz',
+      user_onboarded_at: '2026-05-01T00:00:00Z',
+      members: [],
+      has_champion_bet: true,
+      champion_bet: null,
+      prizes: 'R$100 para o 1º lugar',
+      user_stats: { position: 1, points: 50, guesses_made: 5, guesses_total: 10, exact_scores: 1 },
+      ranking: [
+        { user_id: 'user-1', full_name: 'João', avatar_color: '#FF0000', points: 50, position: 1 },
+      ],
+    } satisfies LeagueDetail
+    expect(detail.prizes).toBe('R$100 para o 1º lugar')
+    expect(detail.user_stats.position).toBe(1)
+    expect(detail.ranking).toHaveLength(1)
   })
 })

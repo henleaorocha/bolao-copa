@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseServerClient } from '@/lib/supabase/client'
 import { formatSuccess, formatError } from '@/lib/api/responses'
-import type { LeagueDetail, LeagueMember } from '@/lib/api/types'
+import type { LeagueDetail, LeagueMember, RankingEntry, UserStats } from '@/lib/api/types'
 
 interface LeagueMemberRecord {
   user_id: string
@@ -68,7 +68,7 @@ export async function GET(
     const leagueResult = await supabase
       .from('leagues')
       .select(
-        `id, name, access_type, logo_url, member_count, description, created_by, created_at, invite_token`
+        `id, name, access_type, logo_url, member_count, description, created_by, created_at, invite_token, prize_pool`
       )
       .eq('id', leagueId)
       .single()
@@ -120,6 +120,36 @@ export async function GET(
     const currentMember = membersResult.data.find((m: LeagueMemberRecord) => m.user_id === user.id)
     const user_onboarded_at = currentMember?.onboarded_at ?? null
 
+    const { data: betData, error: betError } = await supabase
+      .from('champion_bets')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('league_id', leagueId)
+      .maybeSingle()
+
+    const has_champion_bet = !betError && betData !== null
+    const champion_bet = has_champion_bet ? betData : null
+
+    const user_stats: UserStats = {
+      position: 0,
+      points: 0,
+      guesses_made: 0,
+      guesses_total: 0,
+      exact_scores: 0,
+    }
+
+    const ranking: RankingEntry[] = members
+      .slice()
+      .sort((a, b) => new Date(a.joined_at).getTime() - new Date(b.joined_at).getTime())
+      .slice(0, 5)
+      .map((m, i) => ({
+        user_id: m.user_id,
+        full_name: m.full_name,
+        avatar_color: m.avatar_color,
+        points: 0,
+        position: i + 1,
+      }))
+
     const duration = Date.now() - start
     console.log(
       JSON.stringify({
@@ -134,11 +164,17 @@ export async function GET(
       })
     )
 
+    const { prize_pool, ...leagueData } = leagueResult.data
     const response = {
-      ...leagueResult.data,
+      ...leagueData,
+      prizes: prize_pool ?? null,
       role: membershipCheck.data.role,
       user_onboarded_at,
       members,
+      has_champion_bet,
+      champion_bet,
+      user_stats,
+      ranking,
     } as LeagueDetail
 
     return NextResponse.json(formatSuccess(response), { status: 200 })
