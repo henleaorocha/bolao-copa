@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseServerClient } from '@/lib/supabase/client'
 import { formatSuccess, formatError } from '@/lib/api/responses'
+import { isConfirmedMatchup } from '@/lib/bracket-skeleton'
+
+const KNOCKOUT_PHASES = new Set(['32nd', '16th', '8th', 'semi', '3rd_place', 'final'])
 
 export async function PUT(
   request: NextRequest,
@@ -78,7 +81,7 @@ export async function PUT(
     // Guard 4: Match existence
     const matchResult = await supabase
       .from('matches')
-      .select('id, match_date')
+      .select('id, match_date, phase, home_team, away_team')
       .eq('id', matchId)
       .single()
 
@@ -89,7 +92,32 @@ export async function PUT(
       )
     }
 
-    // Guard 5: Deadline — match_date - 1h < now() means deadline passed
+    // Guard 5: Confirmed teams — knockout matches require both teams to be real
+    if (
+      KNOCKOUT_PHASES.has(matchResult.data.phase) &&
+      !isConfirmedMatchup(matchResult.data.home_team, matchResult.data.away_team)
+    ) {
+      const duration = Date.now() - start
+      console.log(
+        JSON.stringify({
+          timestamp: new Date().toISOString(),
+          level: 'info',
+          event: 'prediction_rejected_unconfirmed',
+          endpoint: '/api/leagues/[id]/predictions/[matchId]',
+          method: 'PUT',
+          user_id: user.id,
+          match_id: matchId,
+          status_code: 409,
+          duration_ms: duration,
+        })
+      )
+      return NextResponse.json(
+        formatError('MATCH_NOT_CONFIRMED', 'Partida ainda não confirmada para palpites', 409),
+        { status: 409 }
+      )
+    }
+
+    // Guard 6: Deadline — match_date - 1h < now() means deadline passed
     const deadlineThreshold = new Date(Date.now() + 60 * 60 * 1000)
     if (new Date(matchResult.data.match_date) < deadlineThreshold) {
       const duration = Date.now() - start

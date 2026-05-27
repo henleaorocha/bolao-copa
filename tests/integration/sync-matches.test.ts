@@ -36,12 +36,14 @@ function makeFixture(id: number): ApiFootballFixture {
       id,
       date: '2026-06-14T18:00:00Z',
       venue: { name: 'Test Stadium', city: 'Test City' },
+      status: { short: 'NS' },
     },
     league: { round: 'Group Stage - 1', group: 'Group A' },
     teams: {
       home: { name: 'Brasil', logo: '' },
       away: { name: 'Argentina', logo: '' },
     },
+    goals: { home: null, away: null },
   }
 }
 
@@ -123,12 +125,13 @@ describe.skipIf(!HAS_SERVICE_KEY)('POST /api/admin/sync-matches — integration'
     // Build fixture with same external_id
     const fixtureId = parseInt(externalId, 10)
     const fixture: ApiFootballFixture = {
-      fixture: { id: fixtureId, date: '2026-06-14T19:00:00Z', venue: { name: 'New Stadium', city: 'New City' } },
+      fixture: { id: fixtureId, date: '2026-06-14T19:00:00Z', venue: { name: 'New Stadium', city: 'New City' }, status: { short: 'NS' } },
       league: { round: 'Group Stage - 2', group: 'Group B' },
       teams: {
         home: { name: 'Brasil', logo: '' },
         away: { name: 'França', logo: '' },
       },
+      goals: { home: null, away: null },
     }
 
     vi.mocked(fetchWorldCupFixtures).mockResolvedValue([fixture])
@@ -177,12 +180,13 @@ describe.skipIf(!HAS_SERVICE_KEY)('POST /api/admin/sync-matches — integration'
     const uniqueId = Date.now() + 99002
     vi.mocked(fetchWorldCupFixtures).mockResolvedValue([
       {
-        fixture: { id: uniqueId, date: '2026-06-20T18:00:00Z', venue: { name: 'V', city: 'C' } },
+        fixture: { id: uniqueId, date: '2026-06-20T18:00:00Z', venue: { name: 'V', city: 'C' }, status: { short: 'NS' } },
         league: { round: 'Group Stage - 1', group: 'Group C' },
         teams: {
           home: { name: 'Brasil', logo: '' },
           away: { name: 'Alemanha', logo: '' },
         },
+        goals: { home: null, away: null },
       },
     ])
     insertedExternalIds.push(String(uniqueId))

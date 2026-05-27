@@ -69,6 +69,7 @@ function makeLeague(overrides: Partial<LeagueHubItem> = {}): LeagueHubItem {
     member_count: 10,
     is_member: true,
     is_main: false,
+    owner_name: null,
     ...overrides,
   }
 }

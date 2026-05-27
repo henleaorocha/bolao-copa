@@ -4,7 +4,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import LeagueCard, { getShieldColor } from '@/components/LeagueCard'
+import LeagueCard, { getShieldColor, shortOwnerName } from '@/components/LeagueCard'
 import type { LeagueHubItem } from '@/lib/api/types'
 
 const mockPush = vi.fn()
@@ -23,6 +23,7 @@ function makeLeague(overrides: Partial<LeagueHubItem> = {}): LeagueHubItem {
     member_count: 42,
     is_member: true,
     is_main: false,
+    owner_name: null,
     ...overrides,
   }
 }
@@ -61,6 +62,24 @@ describe('getShieldColor', () => {
   })
 })
 
+// ─── shortOwnerName unit tests ───────────────────────────────────────────────
+
+describe('shortOwnerName', () => {
+  it('shortens a multi-word name to first name + last initial', () => {
+    expect(shortOwnerName('Igor Henrique')).toBe('Igor H.')
+    expect(shortOwnerName('Igor Henrique Silva')).toBe('Igor H.')
+  })
+
+  it('returns a single-word name unchanged', () => {
+    expect(shortOwnerName('Igor')).toBe('Igor')
+  })
+
+  it('returns null for null/empty input', () => {
+    expect(shortOwnerName(null)).toBeNull()
+    expect(shortOwnerName('   ')).toBeNull()
+  })
+})
+
 // ─── LeagueCard component unit tests ─────────────────────────────────────────
 
 describe('LeagueCard', () => {
@@ -77,6 +96,17 @@ describe('LeagueCard', () => {
     expect(screen.getByText('Bolão da Família')).toBeInTheDocument()
     expect(screen.getByText('42 participantes')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /entrar/i })).toBeInTheDocument()
+  })
+
+  it('renders the league owner as a shortened name when owner_name is set', () => {
+    render(<LeagueCard league={makeLeague({ owner_name: 'Igor Henrique' })} />)
+    expect(screen.getByText('Igor H.')).toBeInTheDocument()
+  })
+
+  it('omits the owner segment when owner_name is null', () => {
+    render(<LeagueCard league={makeLeague({ owner_name: null })} />)
+    expect(screen.getByText('42 participantes')).toBeInTheDocument()
+    expect(screen.queryByText('·')).not.toBeInTheDocument()
   })
 
   it('applies shield background color derived from the league name', () => {

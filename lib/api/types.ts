@@ -79,6 +79,16 @@ export interface RankingEntry {
   position: number
 }
 
+export interface RankingFullEntry {
+  user_id: string
+  full_name: string | null
+  avatar_color: string
+  points: number
+  position: number
+  exact_scores: number
+  correct_outcomes: number
+}
+
 export interface LeagueDetail extends LeagueSummary {
   description: string | null
   created_by: string
@@ -119,6 +129,7 @@ export interface LeagueHubItem {
   member_count: number
   is_member: boolean
   is_main: boolean
+  owner_name: string | null
 }
 
 export type LeagueHubResponse = ApiSuccessResponse<{

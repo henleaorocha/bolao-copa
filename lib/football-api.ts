@@ -1,10 +1,25 @@
 export interface ApiFootballFixture {
-  fixture: { id: number; date: string; venue: { name: string; city: string } }
+  fixture: {
+    id: number
+    date: string
+    venue: { name: string; city: string }
+    status: { short: string }
+  }
   league: { round: string; group: string | null }
   teams: {
     home: { name: string; logo: string }
     away: { name: string; logo: string }
   }
+  goals: { home: number | null; away: number | null }
+}
+
+const LIVE_CODES = new Set(['1H', 'HT', '2H', 'ET', 'BT', 'P', 'LIVE', 'INT', 'SUSP'])
+const FINISHED_CODES = new Set(['FT', 'AET', 'PEN'])
+
+export function mapFixtureStatus(code: string): 'scheduled' | 'live' | 'finished' {
+  if (LIVE_CODES.has(code)) return 'live'
+  if (FINISHED_CODES.has(code)) return 'finished'
+  return 'scheduled'
 }
 
 export async function fetchWorldCupFixtures(): Promise<ApiFootballFixture[]> {

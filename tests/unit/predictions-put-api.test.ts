@@ -12,16 +12,49 @@ const MOCK_USER = { id: 'user-123' }
 const MATCH_ID = 'match-abc'
 const LEAGUE_ID = 'league-abc'
 
-// A future match (3h from now) — deadline not passed
+// A future group-stage match (3h from now) — deadline not passed, group bypasses confirmed check
 const FUTURE_MATCH = {
   id: MATCH_ID,
   match_date: new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString(),
+  phase: 'group',
+  home_team: 'Brasil',
+  away_team: 'Argentina',
 }
 
-// A match 30 min from now — deadline IS passed (match_date < now + 1h)
+// A group-stage match 30 min from now — deadline IS passed (match_date < now + 1h)
 const NEAR_MATCH = {
   id: MATCH_ID,
   match_date: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+  phase: 'group',
+  home_team: 'Brasil',
+  away_team: 'Argentina',
+}
+
+// A confirmed knockout match (both real teams) 3h from now — should allow prediction
+const CONFIRMED_KNOCKOUT_MATCH = {
+  id: MATCH_ID,
+  match_date: new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString(),
+  phase: '32nd',
+  home_team: 'Brasil',
+  away_team: 'Argentina',
+}
+
+// A confirmed knockout match 30 min from now — deadline IS passed
+const CONFIRMED_KNOCKOUT_NEAR = {
+  id: MATCH_ID,
+  match_date: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+  phase: '32nd',
+  home_team: 'Brasil',
+  away_team: 'Argentina',
+}
+
+// An unconfirmed knockout match — home team is a TBD placeholder, not a real team
+const UNCONFIRMED_KNOCKOUT_MATCH = {
+  id: MATCH_ID,
+  match_date: new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString(),
+  phase: '32nd',
+  home_team: 'Vencedor 1º Grupo A',
+  away_team: 'Vencedor 2º Grupo B',
 }
 
 const MOCK_PREDICTION_RESPONSE = {
@@ -292,5 +325,62 @@ describe('PUT /api/leagues/[id]/predictions/[matchId]', () => {
     expect(loggedEvent).toBeTruthy()
     expect(loggedEvent?.match_id).toBe(MATCH_ID)
     expect(loggedEvent?.user_id).toBe(MOCK_USER.id)
+  })
+
+  // ─── Confirmed-teams guard (task_05) ─────────────────────────────────────
+
+  it('returns 409 MATCH_NOT_CONFIRMED when a knockout match has unconfirmed teams', async () => {
+    vi.mocked(getSupabaseServerClient).mockResolvedValue(
+      makeSupabase({ matchResult: { data: UNCONFIRMED_KNOCKOUT_MATCH, error: null } }) as never
+    )
+    const res = await PUT(makeRequest({ home_score: 1, away_score: 0 }), makeParams())
+    expect(res.status).toBe(409)
+    const json = await res.json()
+    expect(json.code).toBe('MATCH_NOT_CONFIRMED')
+  })
+
+  it('returns 200 when a confirmed knockout match is bet before deadline', async () => {
+    vi.mocked(getSupabaseServerClient).mockResolvedValue(
+      makeSupabase({ matchResult: { data: CONFIRMED_KNOCKOUT_MATCH, error: null } }) as never
+    )
+    const res = await PUT(makeRequest({ home_score: 2, away_score: 1 }), makeParams())
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    expect(json.status).toBe('success')
+  })
+
+  it('returns 403 DEADLINE_PASSED for a confirmed knockout match within 1h of kickoff', async () => {
+    vi.mocked(getSupabaseServerClient).mockResolvedValue(
+      makeSupabase({ matchResult: { data: CONFIRMED_KNOCKOUT_NEAR, error: null } }) as never
+    )
+    const res = await PUT(makeRequest({ home_score: 1, away_score: 1 }), makeParams())
+    expect(res.status).toBe(403)
+    const json = await res.json()
+    expect(json.code).toBe('DEADLINE_PASSED')
+  })
+
+  it('allows prediction on a group-stage match (no confirmed-teams check)', async () => {
+    vi.mocked(getSupabaseServerClient).mockResolvedValue(makeSupabase() as never)
+    const res = await PUT(makeRequest({ home_score: 3, away_score: 0 }), makeParams())
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    expect(json.status).toBe('success')
+  })
+
+  it('logs prediction_rejected_unconfirmed event when knockout match has unconfirmed teams', async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    vi.mocked(getSupabaseServerClient).mockResolvedValue(
+      makeSupabase({ matchResult: { data: UNCONFIRMED_KNOCKOUT_MATCH, error: null } }) as never
+    )
+    await PUT(makeRequest({ home_score: 1, away_score: 0 }), makeParams())
+    const loggedEvent = logSpy.mock.calls
+      .map((args) => {
+        try { return JSON.parse(args[0] as string) } catch { return null }
+      })
+      .find((obj) => obj?.event === 'prediction_rejected_unconfirmed')
+    expect(loggedEvent).toBeTruthy()
+    expect(loggedEvent?.match_id).toBe(MATCH_ID)
+    expect(loggedEvent?.user_id).toBe(MOCK_USER.id)
+    expect(loggedEvent?.status_code).toBe(409)
   })
 })

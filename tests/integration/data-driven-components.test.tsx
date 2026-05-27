@@ -4,8 +4,14 @@
  * Integration tests for data-driven panel components (StatsRow, PrizesStrip, RankingCard).
  * Verifies composed rendering with realistic data shapes including edge cases.
  */
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
+
+vi.mock('next/link', () => ({
+  default: ({ href, children, className }: { href: string; children: React.ReactNode; className?: string }) => (
+    <a href={href} className={className}>{children}</a>
+  ),
+}))
 import StatsRow from '@/app/ligas/[id]/components/StatsRow'
 import PrizesStrip from '@/app/ligas/[id]/components/PrizesStrip'
 import RankingCard from '@/app/ligas/[id]/components/RankingCard'
@@ -30,16 +36,18 @@ function PanelComposition({
   prizes,
   ranking,
   currentUserId,
+  leagueId = 'test-league',
 }: {
   prizes: string | null
   ranking: RankingEntry[]
   currentUserId: string
+  leagueId?: string
 }) {
   return (
     <div>
       <StatsRow user_stats={zeroStats} member_count={10} />
       <PrizesStrip prizes={prizes} />
-      <RankingCard ranking={ranking} currentUserId={currentUserId} />
+      <RankingCard ranking={ranking} currentUserId={currentUserId} leagueId={leagueId} />
     </div>
   )
 }

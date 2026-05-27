@@ -88,6 +88,7 @@ export default function LeagueDetailPage() {
           <RankingCard
             ranking={league.ranking}
             currentUserId={currentUser.id}
+            leagueId={leagueId}
           />
           <ScoringSchemeCard />
         </div>

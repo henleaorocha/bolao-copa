@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
-import { Trophy, CalendarDays, AlignJustify, Zap, Award, Users, User } from 'lucide-react'
+import { Trophy, CalendarDays, AlignJustify, Zap, Award, Users } from 'lucide-react'
 import InviteShareButton from './InviteShareButton'
 
 interface PainelSidebarProps {
@@ -13,6 +13,7 @@ interface PainelSidebarProps {
   inviteToken: string
   currentUserName: string | null
   currentUserAvatarColor: string
+  mataMataUnlock?: boolean
 }
 
 export default function PainelSidebar({
@@ -22,17 +23,17 @@ export default function PainelSidebar({
   inviteToken,
   currentUserName,
   currentUserAvatarColor,
+  mataMataUnlock = false,
 }: PainelSidebarProps) {
   const pathname = usePathname()
 
   const NAV_ITEMS = [
-    { label: 'Painel',    Icon: Trophy,        href: `/ligas/${leagueId}`,          exact: true  },
-    { label: 'Palpites',  Icon: CalendarDays,  href: `/ligas/${leagueId}/palpites`, exact: false },
-    { label: 'Tabela',    Icon: AlignJustify,  href: `/ligas/${leagueId}/tabela`,   exact: true  },
-    { label: 'Mata-mata', Icon: Zap,           href: null,                          exact: true  },
-    { label: 'Ranking',   Icon: Award,         href: null,                          exact: true  },
-    { label: 'Ligas',     Icon: Users,         href: '/ligas',                      exact: true  },
-    { label: 'Perfil',    Icon: User,          href: null,                          exact: true  },
+    { label: 'Painel',    Icon: Trophy,        href: `/ligas/${leagueId}`,          exact: true,  showDot: false          },
+    { label: 'Palpites',  Icon: CalendarDays,  href: `/ligas/${leagueId}/palpites`, exact: false, showDot: false          },
+    { label: 'Tabela',    Icon: AlignJustify,  href: `/ligas/${leagueId}/tabela`,   exact: true,  showDot: false          },
+    { label: 'Mata-mata', Icon: Zap,           href: `/ligas/${leagueId}/mata-mata`, exact: true, showDot: mataMataUnlock },
+    { label: 'Ranking',   Icon: Award,         href: `/ligas/${leagueId}/ranking`,  exact: true,  showDot: false          },
+    { label: 'Ligas',     Icon: Users,         href: '/ligas',                      exact: true,  showDot: false          },
   ]
   const inviteUrl = `${process.env.NEXT_PUBLIC_SITE_URL ?? (typeof window !== 'undefined' ? window.location.origin : '')}/join?token=${inviteToken}`
   const firstName = currentUserName?.split(' ')[0] ?? 'Você'
@@ -63,43 +64,29 @@ export default function PainelSidebar({
 
       {/* Nav items */}
       <nav className="flex-1 px-3 py-2" aria-label="Navegação do painel">
-        {NAV_ITEMS.map(({ label, Icon, href, exact }) => {
-          const active = href
-            ? exact
-              ? pathname === href
-              : pathname === href || pathname.startsWith(href + '/')
-            : false
+        {NAV_ITEMS.map(({ label, Icon, href, exact, showDot }) => {
+          const active = exact
+            ? pathname === href
+            : pathname === href || pathname.startsWith(href + '/')
           const classes = [
             'flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-semibold mb-1 transition-colors min-h-[44px] w-full',
             active
               ? 'bg-[#0097A9] text-white'
-              : href
-                ? 'text-white/60 hover:text-white/90 hover:bg-white/5'
-                : 'text-white/40 cursor-not-allowed pointer-events-none',
+              : 'text-white/60 hover:text-white/90 hover:bg-white/5',
           ].join(' ')
 
-          const content = (
-            <>
+          return (
+            <Link key={label} href={href} className={classes}>
               <Icon size={18} strokeWidth={active ? 2.5 : 1.8} className="shrink-0" />
               <span className="flex-1">{label}</span>
-              {active && (
-                <span className="w-1.5 h-1.5 rounded-full bg-[#FFC72C] shrink-0" aria-hidden="true" />
+              {(active || showDot) && (
+                <span
+                  className="w-1.5 h-1.5 rounded-full bg-[#FFC72C] shrink-0"
+                  aria-hidden="true"
+                  {...(showDot ? { 'data-testid': 'mata-mata-unlock-dot' } : {})}
+                />
               )}
-            </>
-          )
-
-          if (href) {
-            return (
-              <Link key={label} href={href} className={classes}>
-                {content}
-              </Link>
-            )
-          }
-
-          return (
-            <div key={label} role="button" aria-disabled="true" className={classes}>
-              {content}
-            </div>
+            </Link>
           )
         })}
       </nav>

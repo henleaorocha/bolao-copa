@@ -76,10 +76,35 @@ describe('BottomTabBar', () => {
     expect(painelTab).toHaveAttribute('aria-selected', 'true')
   })
 
-  it('unimplemented tabs (Tabela, Ranking, Perfil) have aria-disabled="true"', () => {
+  it('Ranking tab is enabled with href to the ranking route', () => {
     render(<BottomTabBar leagueId="test-league" />)
-    const allTabs = screen.getAllByRole('tab')
-    const disabledTabs = allTabs.filter(t => t.getAttribute('aria-disabled') === 'true')
-    expect(disabledTabs).toHaveLength(3)
+    const rankingTab = screen.getByRole('tab', { name: /RANKING/i })
+    expect(rankingTab).toHaveAttribute('href', '/ligas/test-league/ranking')
+    expect(rankingTab).not.toHaveAttribute('aria-disabled', 'true')
+    expect(rankingTab.className).not.toContain('pointer-events-none')
+  })
+})
+
+describe('BottomTabBar — mata-mata unlock dot (task_06)', () => {
+  it('shows unlock dot on MATA-MATA tab when mataMataUnlock is true', () => {
+    render(<BottomTabBar leagueId="test-league" mataMataUnlock={true} />)
+    expect(screen.getByTestId('mata-mata-unlock-dot')).toBeInTheDocument()
+  })
+
+  it('does not show unlock dot when mataMataUnlock is false', () => {
+    render(<BottomTabBar leagueId="test-league" mataMataUnlock={false} />)
+    expect(screen.queryByTestId('mata-mata-unlock-dot')).not.toBeInTheDocument()
+  })
+
+  it('does not show unlock dot when mataMataUnlock is omitted', () => {
+    render(<BottomTabBar leagueId="test-league" />)
+    expect(screen.queryByTestId('mata-mata-unlock-dot')).not.toBeInTheDocument()
+  })
+
+  it('unlock dot is inside the MATA-MATA tab', () => {
+    render(<BottomTabBar leagueId="test-league" mataMataUnlock={true} />)
+    const dot = screen.getByTestId('mata-mata-unlock-dot')
+    const mataMataTab = screen.getByRole('tab', { name: /MATA-MATA/i })
+    expect(mataMataTab).toContainElement(dot)
   })
 })

@@ -16,6 +16,7 @@ describe('LeagueHubItem', () => {
       member_count: 5,
       is_member: true,
       is_main: false,
+      owner_name: null,
     }
     expectTypeOf(item).toMatchTypeOf<LeagueHubItem>()
   })

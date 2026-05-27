@@ -116,6 +116,7 @@ describe('GET /api/leagues/hub', () => {
       member_count: 10,
       is_member: true,
       is_main: false,
+      owner_name: null,
     }
     const mockUser = { id: 'user-123', user_metadata: { full_name: 'Test User' } }
     vi.mocked(getSupabaseServerClient).mockResolvedValue(makeSupabase(mockUser) as never)

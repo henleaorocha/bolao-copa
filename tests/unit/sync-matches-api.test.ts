@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
-vi.mock('@/lib/football-api', () => ({
-  fetchWorldCupFixtures: vi.fn(),
-}))
+vi.mock('@/lib/football-api', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/football-api')>()
+  return { ...actual, fetchWorldCupFixtures: vi.fn() }
+})
 
 vi.mock('@supabase/supabase-js', () => ({
   createClient: vi.fn(),
@@ -40,12 +41,13 @@ function makeFixture(
   group: string | null = 'Group A'
 ): ApiFootballFixture {
   return {
-    fixture: { id, date: '2026-06-14T18:00:00Z', venue: { name: 'MetLife', city: 'East Rutherford' } },
+    fixture: { id, date: '2026-06-14T18:00:00Z', venue: { name: 'MetLife', city: 'East Rutherford' }, status: { short: 'NS' } },
     league: { round, group },
     teams: {
       home: { name: homeName, logo: '' },
       away: { name: awayName, logo: '' },
     },
+    goals: { home: null, away: null },
   }
 }
 

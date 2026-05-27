@@ -8,12 +8,14 @@ function makeFixture(id: number): ApiFootballFixture {
       id,
       date: '2026-06-14T18:00:00Z',
       venue: { name: 'MetLife Stadium', city: 'East Rutherford' },
+      status: { short: 'NS' },
     },
     league: { round: 'Group Stage - 1', group: 'Group A' },
     teams: {
       home: { name: 'Brazil', logo: 'https://media.api-sports.io/flags/br.svg' },
       away: { name: 'Argentina', logo: 'https://media.api-sports.io/flags/ar.svg' },
     },
+    goals: { home: null, away: null },
   }
 }
 

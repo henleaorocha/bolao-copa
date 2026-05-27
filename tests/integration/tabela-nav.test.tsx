@@ -85,13 +85,13 @@ describe('Tabela nav activation — PainelSidebar', () => {
     expect(tabela.className).not.toMatch(/bg-\[#0097A9\]/)
   })
 
-  it('keeps "Mata-mata" disabled (href: null — rendered as div)', () => {
+  it('"Mata-mata" is an enabled link to the mata-mata route', () => {
     mockPathname.mockReturnValue(TABELA_ROUTE)
     render(<PainelSidebar {...sidebarProps} />)
 
-    const mataMata = screen.getByRole('button', { name: /mata-mata/i })
-    expect(mataMata).toHaveAttribute('aria-disabled', 'true')
-    expect(mataMata.tagName.toLowerCase()).toBe('div')
+    const mataMata = screen.getByRole('link', { name: /mata-mata/i })
+    expect(mataMata).toHaveAttribute('href', `/ligas/${LEAGUE_ID}/mata-mata`)
+    expect(mataMata).not.toHaveAttribute('aria-disabled', 'true')
   })
 })
 
@@ -130,12 +130,13 @@ describe('Tabela nav activation — BottomTabBar', () => {
     expect(tabela).toHaveAttribute('aria-selected', 'false')
   })
 
-  it('keeps "RANKING" disabled (href: null — rendered as button)', () => {
+  it('"RANKING" is an enabled tab link to the ranking route', () => {
     mockPathname.mockReturnValue(TABELA_ROUTE)
     render(<BottomTabBar leagueId={LEAGUE_ID} />)
 
     const ranking = screen.getByRole('tab', { name: /ranking/i })
-    expect(ranking.tagName.toLowerCase()).toBe('button')
-    expect(ranking).toHaveAttribute('aria-disabled', 'true')
+    expect(ranking.tagName.toLowerCase()).toBe('a')
+    expect(ranking).toHaveAttribute('href', `/ligas/${LEAGUE_ID}/ranking`)
+    expect(ranking).not.toHaveAttribute('aria-disabled', 'true')
   })
 })

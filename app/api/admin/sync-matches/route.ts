@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { revalidateTag } from 'next/cache'
-import { fetchWorldCupFixtures } from '@/lib/football-api'
+import { fetchWorldCupFixtures, mapFixtureStatus } from '@/lib/football-api'
 import { ALL_COPA_TEAMS } from '@/lib/copa-teams'
 import { formatSuccess, formatError } from '@/lib/api/responses'
 import type { Match } from '@/lib/api/types'
@@ -72,7 +72,9 @@ export async function POST(request: NextRequest) {
         group,
         venue: f.fixture.venue.name,
         city: f.fixture.venue.city,
-        status: 'scheduled' as const,
+        status: mapFixtureStatus(f.fixture.status.short),
+        home_score: f.goals.home ?? null,
+        away_score: f.goals.away ?? null,
       }
     })
 
@@ -97,6 +99,20 @@ export async function POST(request: NextRequest) {
     if (deleteError) {
       throw new Error(`DB delete failed: ${deleteError.message}`)
     }
+
+    const finishedCount = rows.filter((r) => r.status === 'finished').length
+    const scoredMatches = rows.filter((r) => r.home_score !== null && r.away_score !== null).length
+    console.log(
+      JSON.stringify({
+        timestamp: new Date().toISOString(),
+        level: 'info',
+        endpoint: '/api/admin/sync-matches',
+        method: 'POST',
+        event: 'sync_result_ingested',
+        finished_count: finishedCount,
+        scored_matches: scoredMatches,
+      })
+    )
 
     revalidateTag('fixtures', { expire: 0 })
 

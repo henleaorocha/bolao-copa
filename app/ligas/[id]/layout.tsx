@@ -11,7 +11,7 @@ import BottomTabBar from './components/BottomTabBar'
 function Shell({ children }: { children: ReactNode }) {
   const params = useParams()
   const leagueId = params.id as string
-  const { league, currentUser, isLoading, error } = useLeaguePanel()
+  const { league, currentUser, isLoading, error, mataMataUnlock } = useLeaguePanel()
 
   if (isLoading) {
     return (
@@ -47,6 +47,7 @@ function Shell({ children }: { children: ReactNode }) {
           inviteToken={league.invite_token}
           currentUserName={currentUser.full_name}
           currentUserAvatarColor={currentUser.avatar_color}
+          mataMataUnlock={!!mataMataUnlock}
         />
       </div>
 
@@ -66,7 +67,7 @@ function Shell({ children }: { children: ReactNode }) {
         </main>
 
         <div className="flex lg:hidden">
-          <BottomTabBar leagueId={leagueId} />
+          <BottomTabBar leagueId={leagueId} mataMataUnlock={!!mataMataUnlock} />
         </div>
       </div>
     </div>

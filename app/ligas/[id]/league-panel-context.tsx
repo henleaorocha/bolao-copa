@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react'
 import { useParams } from 'next/navigation'
 import type { LeagueDetail, AuthUser } from '@/lib/api/types'
+import type { KnockoutPhase } from '@/lib/bracket-skeleton'
 
 interface LeaguePanelContextValue {
   league: LeagueDetail | null
@@ -10,6 +11,8 @@ interface LeaguePanelContextValue {
   isLoading: boolean
   error: string | null
   refetchLeague: () => Promise<void>
+  mataMataUnlock: KnockoutPhase | null
+  setMataMataUnlock: (phase: KnockoutPhase | null) => void
 }
 
 const LeaguePanelCtx = createContext<LeaguePanelContextValue | null>(null)
@@ -22,6 +25,7 @@ export function LeaguePanelProvider({ children }: { children: ReactNode }) {
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [mataMataUnlock, setMataMataUnlock] = useState<KnockoutPhase | null>(null)
 
   const fetchData = useCallback(async () => {
     try {
@@ -51,7 +55,7 @@ export function LeaguePanelProvider({ children }: { children: ReactNode }) {
   }, [fetchData])
 
   return (
-    <LeaguePanelCtx.Provider value={{ league, currentUser, isLoading, error, refetchLeague: fetchData }}>
+    <LeaguePanelCtx.Provider value={{ league, currentUser, isLoading, error, refetchLeague: fetchData, mataMataUnlock, setMataMataUnlock }}>
       {children}
     </LeaguePanelCtx.Provider>
   )

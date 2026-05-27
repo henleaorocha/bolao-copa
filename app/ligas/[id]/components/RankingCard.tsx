@@ -1,10 +1,12 @@
 'use client'
 
+import Link from 'next/link'
 import type { RankingEntry } from '@/lib/api/types'
 
 interface RankingCardProps {
   ranking: RankingEntry[]
   currentUserId: string
+  leagueId: string
 }
 
 interface BadgeStyle {
@@ -39,7 +41,7 @@ function PositionBadge({ position }: { position: number }) {
   )
 }
 
-export default function RankingCard({ ranking, currentUserId }: RankingCardProps) {
+export default function RankingCard({ ranking, currentUserId, leagueId }: RankingCardProps) {
   return (
     <div className="rounded-xl bg-white shadow-sm overflow-hidden">
       <div className="px-4 py-3 border-b border-slate-100">
@@ -70,14 +72,12 @@ export default function RankingCard({ ranking, currentUserId }: RankingCardProps
         })}
       </div>
       <div className="px-4 py-3 border-t border-slate-100 text-right">
-        <a
-          href="#"
-          aria-disabled="true"
-          className="text-sm font-semibold text-yellow-600 opacity-50 cursor-not-allowed pointer-events-none"
-          tabIndex={-1}
+        <Link
+          href={`/ligas/${leagueId}/ranking`}
+          className="text-sm font-semibold text-yellow-600 hover:text-yellow-700 transition-colors"
         >
           Ver tudo →
-        </a>
+        </Link>
       </div>
     </div>
   )

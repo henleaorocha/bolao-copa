@@ -1,10 +1,16 @@
 /**
  * @vitest-environment jsdom
  */
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import RankingCard from '@/app/ligas/[id]/components/RankingCard'
 import type { RankingEntry } from '@/lib/api/types'
+
+vi.mock('next/link', () => ({
+  default: ({ href, children, className }: { href: string; children: React.ReactNode; className?: string }) => (
+    <a href={href} className={className}>{children}</a>
+  ),
+}))
 
 const makeEntry = (overrides: Partial<RankingEntry> & { user_id: string; position: number }): RankingEntry => ({
   full_name: `User ${overrides.position}`,
@@ -23,7 +29,7 @@ const fiveEntries: RankingEntry[] = [
 
 describe('RankingCard', () => {
   it('renders 5 rows for a 5-entry ranking', () => {
-    render(<RankingCard ranking={fiveEntries} currentUserId="u99" />)
+    render(<RankingCard ranking={fiveEntries} currentUserId="u99" leagueId="test-league" />)
     expect(screen.getByText('User 1')).toBeInTheDocument()
     expect(screen.getByText('User 2')).toBeInTheDocument()
     expect(screen.getByText('User 3')).toBeInTheDocument()
@@ -32,7 +38,7 @@ describe('RankingCard', () => {
   })
 
   it('current-user row has a highlight CSS class distinct from other rows', () => {
-    const { container } = render(<RankingCard ranking={fiveEntries} currentUserId="u3" />)
+    const { container } = render(<RankingCard ranking={fiveEntries} currentUserId="u3" leagueId="test-league" />)
     const rows = container.querySelectorAll('[class*="flex items-center gap-3 px-4 py-3"]')
     const highlighted = Array.from(rows).filter(row =>
       row.className.includes('bg-yellow-50'),
@@ -45,39 +51,41 @@ describe('RankingCard', () => {
   })
 
   it('first-place row contains the gold badge element', () => {
-    render(<RankingCard ranking={fiveEntries} currentUserId="u99" />)
+    render(<RankingCard ranking={fiveEntries} currentUserId="u99" leagueId="test-league" />)
     expect(screen.getByTestId('gold-badge')).toBeInTheDocument()
   })
 
   it('second-place row contains the silver badge element', () => {
-    render(<RankingCard ranking={fiveEntries} currentUserId="u99" />)
+    render(<RankingCard ranking={fiveEntries} currentUserId="u99" leagueId="test-league" />)
     expect(screen.getByTestId('silver-badge')).toBeInTheDocument()
   })
 
   it('third-place row contains the bronze badge element', () => {
-    render(<RankingCard ranking={fiveEntries} currentUserId="u99" />)
+    render(<RankingCard ranking={fiveEntries} currentUserId="u99" leagueId="test-league" />)
     expect(screen.getByTestId('bronze-badge')).toBeInTheDocument()
   })
 
-  it('"Ver tudo" link has aria-disabled="true"', () => {
-    render(<RankingCard ranking={fiveEntries} currentUserId="u99" />)
-    const link = screen.getByText(/Ver tudo/)
-    expect(link).toHaveAttribute('aria-disabled', 'true')
+  it('"Ver tudo" is a link to the ranking route', () => {
+    render(<RankingCard ranking={fiveEntries} currentUserId="u99" leagueId="test-league" />)
+    const link = screen.getByRole('link', { name: /Ver tudo/i })
+    expect(link).toHaveAttribute('href', '/ligas/test-league/ranking')
+    expect(link).not.toHaveAttribute('aria-disabled', 'true')
+    expect(link.className).not.toContain('pointer-events-none')
   })
 
   it('renders avatar initial from full_name', () => {
-    render(<RankingCard ranking={[makeEntry({ user_id: 'u1', position: 1, full_name: 'Ana Silva' })]} currentUserId="u99" />)
+    render(<RankingCard ranking={[makeEntry({ user_id: 'u1', position: 1, full_name: 'Ana Silva' })]} currentUserId="u99" leagueId="test-league" />)
     expect(screen.getByText('A')).toBeInTheDocument()
   })
 
   it('renders "U" initial when full_name is null', () => {
-    render(<RankingCard ranking={[makeEntry({ user_id: 'u1', position: 1, full_name: null })]} currentUserId="u99" />)
+    render(<RankingCard ranking={[makeEntry({ user_id: 'u1', position: 1, full_name: null })]} currentUserId="u99" leagueId="test-league" />)
     expect(screen.getByText('U')).toBeInTheDocument()
   })
 
   it('renders correctly with fewer than 5 entries', () => {
     const twoEntries = fiveEntries.slice(0, 2)
-    const { container } = render(<RankingCard ranking={twoEntries} currentUserId="u99" />)
+    const { container } = render(<RankingCard ranking={twoEntries} currentUserId="u99" leagueId="test-league" />)
     expect(screen.getByText('User 1')).toBeInTheDocument()
     expect(screen.getByText('User 2')).toBeInTheDocument()
     expect(screen.queryByText('User 3')).not.toBeInTheDocument()

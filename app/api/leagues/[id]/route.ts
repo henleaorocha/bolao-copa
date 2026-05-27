@@ -2,17 +2,42 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseServerClient } from '@/lib/supabase/client'
 import { formatSuccess, formatError } from '@/lib/api/responses'
 import type { LeagueDetail, LeagueMember, RankingEntry, UserStats } from '@/lib/api/types'
+import { computeRanking } from '@/lib/ranking'
+
+interface UserEmbed {
+  full_name: string | null
+  avatar_url: string | null
+  avatar_color: string
+}
 
 interface LeagueMemberRecord {
   user_id: string
   role: 'admin' | 'member'
   joined_at: string
   onboarded_at: string | null
-  users: {
-    full_name: string | null
-    avatar_url: string | null
-    avatar_color: string
-  }[]
+  // PostgREST returns the to-one users join as an object; older generated
+  // types model it as an array — accept both so full_name always resolves.
+  users: UserEmbed | UserEmbed[] | null
+}
+
+interface FinishedMatchRow {
+  id: string
+  phase: string
+  home_team: string
+  away_team: string
+  home_score: number | null
+  away_score: number | null
+  match_date: string
+}
+
+interface ChampionBetRow {
+  id: string
+  user_id: string
+  league_id: string
+  champion_team: string
+  runner_up_team: string
+  created_at: string
+  updated_at: string
 }
 
 export async function GET(
@@ -108,47 +133,105 @@ export async function GET(
     }
 
     // Map members to LeagueMember[]
-    const members: LeagueMember[] = membersResult.data.map((row: LeagueMemberRecord) => ({
-      user_id: row.user_id,
-      full_name: row.users?.[0]?.full_name ?? null,
-      avatar_url: row.users?.[0]?.avatar_url ?? null,
-      avatar_color: row.users?.[0]?.avatar_color ?? '',
-      role: row.role,
-      joined_at: row.joined_at,
-    }))
+    const members: LeagueMember[] = membersResult.data.map((row: LeagueMemberRecord) => {
+      const u = Array.isArray(row.users) ? row.users[0] : row.users
+      return {
+        user_id: row.user_id,
+        full_name: u?.full_name ?? null,
+        avatar_url: u?.avatar_url ?? null,
+        avatar_color: u?.avatar_color ?? '',
+        role: row.role,
+        joined_at: row.joined_at,
+      }
+    })
 
     const currentMember = membersResult.data.find((m: LeagueMemberRecord) => m.user_id === user.id)
     const user_onboarded_at = currentMember?.onboarded_at ?? null
 
-    const { data: betData, error: betError } = await supabase
+    // Load all champion bets for the league (used for scoring + has_champion_bet)
+    const { data: allChampBets, error: champBetsError } = await supabase
       .from('champion_bets')
-      .select('*')
-      .eq('user_id', user.id)
+      .select('id, user_id, league_id, champion_team, runner_up_team, created_at, updated_at')
       .eq('league_id', leagueId)
-      .maybeSingle()
 
-    const has_champion_bet = !betError && betData !== null
-    const champion_bet = has_champion_bet ? betData : null
-
-    const user_stats: UserStats = {
-      position: 0,
-      points: 0,
-      guesses_made: 0,
-      guesses_total: 0,
-      exact_scores: 0,
+    if (champBetsError) {
+      console.error('[api/leagues/[id] GET] champion_bets error:', champBetsError.message)
     }
 
-    const ranking: RankingEntry[] = members
-      .slice()
-      .sort((a, b) => new Date(a.joined_at).getTime() - new Date(b.joined_at).getTime())
-      .slice(0, 5)
-      .map((m, i) => ({
+    // Load all predictions for this league
+    const { data: allPredictions, error: predictionsError } = await supabase
+      .from('predictions')
+      .select('user_id, match_id, predicted_home_score, predicted_away_score')
+      .eq('league_id', leagueId)
+
+    if (predictionsError) {
+      console.error('[api/leagues/[id] GET] predictions error:', predictionsError.message)
+    }
+
+    // Load all finished matches
+    const { data: finishedMatches, error: matchesError } = await supabase
+      .from('matches')
+      .select('id, phase, home_team, away_team, home_score, away_score, match_date')
+      .eq('status', 'finished')
+
+    if (matchesError) {
+      console.error('[api/leagues/[id] GET] matches error:', matchesError.message)
+    }
+
+    // Build lookups
+    const finishedMatchMap = new Map<string, FinishedMatchRow>(
+      (finishedMatches ?? []).map((m) => [m.id, m])
+    )
+
+    const champBetByUser = new Map<string, ChampionBetRow>(
+      (allChampBets ?? []).map((b) => [b.user_id, b])
+    )
+
+    // Compute full ordered ranking using shared helper
+    const rankingResult = computeRanking({
+      members: members.map((m) => ({
         user_id: m.user_id,
         full_name: m.full_name,
         avatar_color: m.avatar_color,
-        points: 0,
-        position: i + 1,
-      }))
+        joined_at: m.joined_at,
+      })),
+      predictions: allPredictions ?? [],
+      finishedMatches: (finishedMatches ?? []) as Parameters<typeof computeRanking>[0]['finishedMatches'],
+      championBets: (allChampBets ?? []).map((b) => ({
+        user_id: b.user_id,
+        champion_team: b.champion_team,
+        runner_up_team: b.runner_up_team,
+      })),
+    })
+
+    // Top-5 slice for panel ranking card
+    const ranking: RankingEntry[] = rankingResult.slice(0, 5).map((entry) => ({
+      user_id: entry.user_id,
+      full_name: entry.full_name,
+      avatar_color: entry.avatar_color,
+      points: entry.points,
+      position: entry.position,
+    }))
+
+    // Derive user_stats: position/points/exact_scores from helper; guesses from raw data
+    const currentUserEntry = rankingResult.find((e) => e.user_id === user.id)
+    const guesses_made = (allPredictions ?? []).filter((p) => {
+      if (p.user_id !== user.id) return false
+      if (p.predicted_home_score === null || p.predicted_away_score === null) return false
+      const match = finishedMatchMap.get(p.match_id)
+      return match !== undefined && match.home_score !== null && match.away_score !== null
+    }).length
+    const user_stats: UserStats = {
+      position: currentUserEntry?.position ?? 0,
+      points: currentUserEntry?.points ?? 0,
+      guesses_made,
+      guesses_total: finishedMatchMap.size,
+      exact_scores: currentUserEntry?.exact_scores ?? 0,
+    }
+
+    const currentUserChampBet = champBetByUser.get(user.id) ?? null
+    const has_champion_bet = currentUserChampBet !== null
+    const champion_bet = currentUserChampBet
 
     const duration = Date.now() - start
     console.log(

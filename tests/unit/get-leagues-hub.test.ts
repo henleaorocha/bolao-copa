@@ -42,11 +42,12 @@ function makeLeagueRecord(
   access_type: 'open' | 'private' = 'open',
   member_count = 10
 ) {
-  return { id, name, access_type, logo_url: null, member_count }
+  return { id, name, access_type, logo_url: null, member_count, created_by: null }
 }
 
+// PostgREST returns the membership→leagues to-one embed as a single object.
 function makeMembership(league: ReturnType<typeof makeLeagueRecord>, joined_at: string) {
-  return { joined_at, leagues: [league] }
+  return { joined_at, leagues: league }
 }
 
 describe('getLeaguesHub', () => {
