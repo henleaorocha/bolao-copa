@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import Image from 'next/image'
+import { createClient } from '@supabase/supabase-js'
 import { getSupabaseServerClient } from '@/lib/supabase/client'
 import { JoinButton } from './JoinButton'
 
@@ -39,8 +40,17 @@ export default async function JoinPage({ searchParams }: JoinPageProps) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  // Query league by invite_token (includes token in SELECT for validation)
-  const leagueResult = await supabase
+  // Look up the league by invite_token with the service role: a PRIVATE league is
+  // invisible to a non-member under RLS, so reading it with the user's client
+  // returns 0 rows ("Liga Não Encontrada") and invites can never be opened. The
+  // token is the secret that authorises this read (migration 11 / ADR-003, same
+  // pattern as POST /api/leagues/[id]/join).
+  const adminClient = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  )
+  const leagueResult = await adminClient
     .from('leagues')
     .select('id, name, access_type, logo_url, member_count, invite_token')
     .eq('invite_token', token.trim())
