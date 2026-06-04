@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 import { getSupabaseServerClient } from '@/lib/supabase/client'
 import { formatSuccess, formatError } from '@/lib/api/responses'
 import type { Match, MatchDetail, OutcomeDistribution } from '@/lib/api/types'
@@ -87,7 +88,19 @@ export async function GET(
     let distribution: OutcomeDistribution | null = null
 
     if (is_deadline_passed) {
-      const { data: allPredictions } = await supabase
+      // Aggregate every member's prediction with the service role. Under the
+      // viewer's RLS, predictions_select_league_peers only exposes co-members'
+      // picks once the match is 'finished' (to avoid leaking picks before
+      // kickoff), so the viewer's own client would count only their own bet and
+      // report a bogus 100%. Membership and the deadline are already enforced
+      // above, and only aggregate percentages (never individual picks) are
+      // returned, so reading all rows here doesn't leak anyone's pick.
+      const adminClient = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!,
+        { auth: { autoRefreshToken: false, persistSession: false } }
+      )
+      const { data: allPredictions } = await adminClient
         .from('predictions')
         .select('predicted_home_score, predicted_away_score')
         .eq('league_id', leagueId)

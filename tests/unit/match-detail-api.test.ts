@@ -5,8 +5,13 @@ vi.mock('@/lib/supabase/client', () => ({
   getSupabaseServerClient: vi.fn(),
 }))
 
+vi.mock('@supabase/supabase-js', () => ({
+  createClient: vi.fn(),
+}))
+
 import { GET } from '@/app/api/leagues/[id]/matches/[matchId]/route'
 import { getSupabaseServerClient } from '@/lib/supabase/client'
+import { createClient } from '@supabase/supabase-js'
 
 const MOCK_USER = { id: 'user-abc' }
 const LEAGUE_ID = 'league-xyz'
@@ -78,8 +83,6 @@ function makeSupabase(opts: {
     distributionResult = { data: [], error: null },
   } = opts
 
-  let predictionsCallCount = 0
-
   const from = vi.fn((table: string) => {
     if (table === 'leagues') {
       const single = vi.fn().mockResolvedValue(leagueResult)
@@ -101,17 +104,24 @@ function makeSupabase(opts: {
     }
 
     if (table === 'predictions') {
-      predictionsCallCount++
-      if (predictionsCallCount === 1) {
-        // User prediction query — ends with .single()
-        return makeChainableQuery(userPredictionResult)
-      }
-      // Distribution query — no .single(), resolves as array
-      return makeChainableQuery(distributionResult)
+      // Only the viewer's own prediction is read through the user client now —
+      // the distribution is aggregated by the service-role admin client.
+      return makeChainableQuery(userPredictionResult)
     }
 
     return {}
   })
+
+  // The distribution aggregation runs on a separate service-role client built
+  // with createClient(); wire it to return distributionResult for predictions.
+  vi.mocked(createClient).mockReturnValue({
+    from: vi.fn((table: string) => {
+      if (table === 'predictions') {
+        return makeChainableQuery(distributionResult)
+      }
+      return makeChainableQuery({ data: null, error: null })
+    }),
+  } as never)
 
   return {
     auth: {
