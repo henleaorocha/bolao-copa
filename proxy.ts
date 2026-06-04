@@ -4,8 +4,10 @@ import type { NextRequest } from 'next/server'
 
 // Páginas acessíveis sem autenticação
 const PAGINAS_PUBLICAS  = ['/', '/login', '/auth/callback']
-// Rotas de API acessíveis sem autenticação
-const APIS_PUBLICAS     = ['/api/health']
+// Rotas de API acessíveis sem autenticação de sessão.
+// /api/admin/sync-matches não usa sessão: é chamada pelo cron (pg_cron) com
+// `Authorization: Bearer <service_role_key>`, validada dentro do próprio handler.
+const APIS_PUBLICAS     = ['/api/health', '/api/admin/sync-matches']
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request })
