@@ -74,8 +74,8 @@ describe('copa-teams static data', () => {
     expect(VALID_TEAM_NAMES.size).toBe(48)
   })
 
-  it('BET_DEADLINE equals new Date("2026-06-11T21:00:00.000Z")', () => {
-    expect(BET_DEADLINE.getTime()).toBe(new Date('2026-06-11T21:00:00.000Z').getTime())
+  it('BET_DEADLINE equals new Date("2026-06-11T19:00:00.000Z") (opening match kickoff)', () => {
+    expect(BET_DEADLINE.getTime()).toBe(new Date('2026-06-11T19:00:00.000Z').getTime())
   })
 
   it('ALL_COPA_TEAMS entry for "Inglaterra" has code === "gb-eng"', () => {

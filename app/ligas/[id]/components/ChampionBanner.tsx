@@ -2,8 +2,16 @@
 
 import { useState } from 'react'
 import { Flame, Crown, CalendarDays } from 'lucide-react'
-import { BET_DEADLINE } from '@/lib/copa-teams'
+import { BET_DEADLINE, OPENING_MATCH_KICKOFF } from '@/lib/copa-teams'
 import PreCopaBetModal from '@/components/PreCopaBetModal'
+
+const TZ = 'America/Sao_Paulo'
+
+function formatKickoff(date: Date): string {
+  const day = date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', timeZone: TZ })
+  const time = date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: TZ })
+  return `${day} · ${time}`
+}
 
 interface ChampionBannerProps {
   has_champion_bet: boolean
@@ -65,7 +73,7 @@ export default function ChampionBanner({ has_champion_bet, leagueId, onBetComple
             </div>
             <div className="text-xs opacity-60 mt-2 flex items-center gap-1.5">
               <CalendarDays size={12} />
-              México × África do Sul · 11/6 · 19:00
+              México × África do Sul · {formatKickoff(OPENING_MATCH_KICKOFF)}
             </div>
           </div>
 
