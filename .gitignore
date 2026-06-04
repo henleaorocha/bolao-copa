@@ -40,3 +40,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Playwright (validation harness) generated artifacts
+/test-results/
+/playwright-report/

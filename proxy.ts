@@ -23,9 +23,12 @@ export async function proxy(request: NextRequest) {
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
           // Recria response com request atualizado para que cookies sejam visíveis
           response = NextResponse.next({ request })
-          // Propaga cookies para o browser via Set-Cookie
+          // Propaga cookies para o browser via Set-Cookie.
+          // httpOnly forçado: nenhum código client-side lê a sessão (apenas o
+          // login dispara OAuth), então o token de auth — que embute o
+          // provider_token do Google — não deve ser legível por document.cookie.
           cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options)
+            response.cookies.set(name, value, { ...options, httpOnly: true })
           )
           // Aplica headers de cache-control do Supabase (previne cache CDN de respostas auth)
           Object.entries(headers).forEach(([chave, valor]) =>

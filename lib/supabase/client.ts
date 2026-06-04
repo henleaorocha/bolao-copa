@@ -14,8 +14,11 @@ export async function getSupabaseServerClient() {
         },
         setAll(cookiesToSet, _headers) {
           try {
+            // httpOnly forçado: o token de auth (que embute o provider_token do
+            // Google) não deve ser legível por document.cookie. Nenhum cliente
+            // browser lê a sessão neste app.
             cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
+              cookieStore.set(name, value, { ...options, httpOnly: true })
             )
           } catch {
             // Ignorado em Server Components — cookies são somente leitura

@@ -1,46 +1,232 @@
-export interface ApiFootballFixture {
-  fixture: {
-    id: number
-    date: string
-    venue: { name: string; city: string }
-    status: { short: string }
-  }
-  league: { round: string; group: string | null }
-  teams: {
-    home: { name: string; logo: string }
-    away: { name: string; logo: string }
-  }
-  goals: { home: number | null; away: number | null }
+// openfootball ingestion adapter.
+//
+// Replaces the previous third-party paid API integration (ADR-006). Keeps the exported seam
+// `fetchWorldCupFixtures()` so the sync route, hourly cron, upsert-by-
+// `external_id`, and test mocks are preserved, but consumes openfootball's free
+// 2026 JSON instead. openfootball's schema differs structurally: English names,
+// split `date`/`time` with a local UTC offset, `ground` is a city (not a
+// stadium), there is no status enum or live concept, no numeric fixture id, and
+// `score` is absent until a match is played. The knockout topology is encoded
+// as a stable game `num` (73..102 on R32..SF) plus `W##`/`#A`/`L##`
+// placeholders; Final and third place carry no `num`.
+
+import { ALL_COPA_TEAMS, VALID_TEAM_NAMES } from '@/lib/copa-teams'
+import { OPENFOOTBALL_TO_PT, toPtName } from '@/lib/team-names'
+
+const OPENFOOTBALL_URL =
+  'https://raw.githubusercontent.com/openfootball/worldcup.json/master/2026/worldcup.json'
+
+export type MatchPhase =
+  | 'group'
+  | '32nd'
+  | '16th'
+  | '8th'
+  | 'semi'
+  | '3rd_place'
+  | 'final'
+
+// Raw openfootball match shape (mirrors the pinned fixture
+// tests/fixtures/openfootball-wc2026.json).
+export interface OpenfootballMatch {
+  round: string // "Matchday 1" | "Round of 32" | "Quarter-final" | "Final" | ...
+  num?: number // present on R32..SF (73..102); absent on Final & 3rd place
+  date: string // "2026-07-04"
+  time: string // "17:00 UTC-4"
+  team1: string // EN name OR placeholder ("Mexico" | "2A" | "W74" | "L101")
+  team2: string
+  group?: string // "Group A" (group matches only)
+  ground: string // city, e.g. "Los Angeles (Inglewood)"
+  score?: { ft?: [number, number] } // absent until played
 }
 
-const LIVE_CODES = new Set(['1H', 'HT', '2H', 'ET', 'BT', 'P', 'LIVE', 'INT', 'SUSP'])
-const FINISHED_CODES = new Set(['FT', 'AET', 'PEN'])
-
-export function mapFixtureStatus(code: string): 'scheduled' | 'live' | 'finished' {
-  if (LIVE_CODES.has(code)) return 'live'
-  if (FINISHED_CODES.has(code)) return 'finished'
-  return 'scheduled'
+// Internal row shape consumed by the sync route (one `matches` table row).
+export interface MatchRow {
+  external_id: string // "wc2026-73" | "wc2026-final" | "wc2026-A-Brasil-..."
+  home_team: string
+  away_team: string
+  home_flag: string | null
+  away_flag: string | null
+  match_date: string // ISO timestamptz (date + offset combined)
+  phase: MatchPhase
+  group: string | null
+  venue: string
+  city: string
+  status: 'scheduled' | 'finished'
+  home_score: number | null
+  away_score: number | null
 }
 
-export async function fetchWorldCupFixtures(): Promise<ApiFootballFixture[]> {
-  const res = await fetch(
-    'https://v3.football.api-sports.io/fixtures?league=1&season=2026',
-    {
-      headers: { 'x-apisports-key': process.env.API_FOOTBALL_KEY! },
-      next: { revalidate: 3600, tags: ['fixtures'] },
-    }
+// openfootball round names → internal phase. Group matches use "Matchday N"
+// and are handled separately. Knockout names are matched verbatim (both the
+// singular forms in the captured fixture and tolerant plural aliases).
+const ROUND_TO_PHASE: Record<string, MatchPhase> = {
+  'Round of 32': '32nd',
+  'Round of 16': '16th',
+  'Quarter-final': '8th',
+  'Quarter-finals': '8th',
+  'Semi-final': 'semi',
+  'Semi-finals': 'semi',
+  'Match for third place': '3rd_place',
+  '3rd Place': '3rd_place',
+  Final: 'final',
+}
+
+function resolveFlag(teamName: string): string | null {
+  return ALL_COPA_TEAMS.find((t) => t.name === teamName)?.code ?? null
+}
+
+// Knockout slot placeholders ("2A", "1E", "3A/B/C/D/F", "W74", "L101") rather
+// than real teams. Used so the adapter only logs genuinely unmapped real names,
+// not the expected pre-fill placeholders. No real team name starts with a digit
+// or with W/L followed by a digit.
+function isPlaceholder(name: string): boolean {
+  return /^\d/.test(name) || /^[WL]\d/.test(name)
+}
+
+// Log an unmapped real team string structurally without failing the run, so the
+// gap is visible and the row still upserts with the original string left as-is.
+function logUnmappedTeam(name: string): void {
+  console.warn(
+    JSON.stringify({
+      timestamp: new Date().toISOString(),
+      level: 'warn',
+      source: 'openfootball',
+      event: 'ingestion_unmapped_team',
+      team: name,
+    })
   )
+}
+
+function normalizeTeam(raw: string): string {
+  if (
+    !isPlaceholder(raw) &&
+    !(raw in OPENFOOTBALL_TO_PT) &&
+    !VALID_TEAM_NAMES.has(raw)
+  ) {
+    logUnmappedTeam(raw)
+  }
+  return toPtName(raw)
+}
+
+// Combine an openfootball date ("2026-06-11") and time-with-offset
+// ("13:00 UTC-6") into an ISO timestamptz instant. The UTC±N offset is applied
+// so the stored instant is correct regardless of viewer timezone. Unknown time
+// shapes fall back to midnight UTC rather than throwing.
+function toIsoTimestamp(date: string, time: string): string {
+  const [hm = '00:00', tz = ''] = time.trim().split(/\s+/)
+  let offset = '+00:00'
+  const m = tz.match(/^UTC([+-])(\d{1,2})(?::?(\d{2}))?$/)
+  if (m) {
+    const sign = m[1]
+    const hh = m[2].padStart(2, '0')
+    const mm = (m[3] ?? '00').padStart(2, '0')
+    offset = `${sign}${hh}:${mm}`
+  }
+  const instant = new Date(`${date}T${hm}:00${offset}`)
+  if (Number.isNaN(instant.getTime())) {
+    // Malformed date/time: preserve the calendar day at UTC midnight.
+    return new Date(`${date}T00:00:00Z`).toISOString()
+  }
+  return instant.toISOString()
+}
+
+function parsePhaseAndGroup(m: OpenfootballMatch): {
+  phase: MatchPhase
+  group: string | null
+} {
+  if (m.round.startsWith('Matchday')) {
+    return {
+      phase: 'group',
+      group: m.group ? m.group.replace(/^Group /, '') : null,
+    }
+  }
+  return { phase: ROUND_TO_PHASE[m.round] ?? 'group', group: null }
+}
+
+// Synthesize a stable external_id:
+//   knockout R32..SF → `wc2026-<num>`
+//   Final            → `wc2026-final`
+//   3rd place        → `wc2026-3rd`
+//   group            → `wc2026-<group>-<team1>-<team2>` (PT names, stable per draw)
+function buildExternalId(
+  m: OpenfootballMatch,
+  phase: MatchPhase,
+  group: string | null,
+  homeTeam: string,
+  awayTeam: string
+): string {
+  if (m.num != null) return `wc2026-${m.num}`
+  if (phase === 'final') return 'wc2026-final'
+  if (phase === '3rd_place') return 'wc2026-3rd'
+  if (phase === 'group') return `wc2026-${group}-${homeTeam}-${awayTeam}`
+  // Knockout match without a num and not Final/3rd (not expected in the source):
+  // fall back to a round-derived key so the row still has a stable id.
+  return `wc2026-${m.round}-${homeTeam}-${awayTeam}`
+}
+
+// Derive status and scores from the optional `score` object. `score.ft` present
+// (a 2-number tuple) → finished with those scores; everything else (absent or
+// unknown shape) falls back to scheduled with null scores.
+function deriveResult(score: OpenfootballMatch['score']): {
+  status: MatchRow['status']
+  home_score: number | null
+  away_score: number | null
+} {
+  const ft = score?.ft
+  if (
+    Array.isArray(ft) &&
+    ft.length === 2 &&
+    typeof ft[0] === 'number' &&
+    typeof ft[1] === 'number'
+  ) {
+    return { status: 'finished', home_score: ft[0], away_score: ft[1] }
+  }
+  return { status: 'scheduled', home_score: null, away_score: null }
+}
+
+// Map a single openfootball match to the internal `matches` row shape.
+export function mapOpenfootballMatch(m: OpenfootballMatch): MatchRow {
+  const { phase, group } = parsePhaseAndGroup(m)
+  const homeTeam = normalizeTeam(m.team1)
+  const awayTeam = normalizeTeam(m.team2)
+  const { status, home_score, away_score } = deriveResult(m.score)
+
+  return {
+    external_id: buildExternalId(m, phase, group, homeTeam, awayTeam),
+    home_team: homeTeam,
+    away_team: awayTeam,
+    home_flag: resolveFlag(homeTeam),
+    away_flag: resolveFlag(awayTeam),
+    match_date: toIsoTimestamp(m.date, m.time),
+    phase,
+    group,
+    venue: m.ground,
+    city: m.ground,
+    status,
+    home_score,
+    away_score,
+  }
+}
+
+// Fetch the openfootball 2026 schedule. No api key. Preserves the existing cache
+// contract (`next: { revalidate: 3600, tags: ['fixtures'] }`). Defensive parse:
+// a non-array / `matches`-less body throws so the sync route reports the failure
+// rather than upserting garbage.
+export async function fetchWorldCupFixtures(): Promise<OpenfootballMatch[]> {
+  const res = await fetch(OPENFOOTBALL_URL, {
+    next: { revalidate: 3600, tags: ['fixtures'] },
+  })
 
   if (!res.ok) {
-    throw new Error(`API Football responded with ${res.status}`)
+    throw new Error(`openfootball responded with ${res.status}`)
   }
 
-  const json = await res.json()
-  const data: unknown = json.response
+  const json: unknown = await res.json()
+  const matches = (json as { matches?: unknown } | null)?.matches
 
-  if (!Array.isArray(data)) {
-    throw new Error('API Football response is malformed: expected array')
+  if (!Array.isArray(matches)) {
+    throw new Error('openfootball response is malformed: expected matches array')
   }
 
-  return data as ApiFootballFixture[]
+  return matches as OpenfootballMatch[]
 }

@@ -1,39 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { revalidateTag } from 'next/cache'
-import { fetchWorldCupFixtures, mapFixtureStatus } from '@/lib/football-api'
-import { ALL_COPA_TEAMS } from '@/lib/copa-teams'
+import { fetchWorldCupFixtures, mapOpenfootballMatch } from '@/lib/football-api'
 import { formatSuccess, formatError } from '@/lib/api/responses'
-import type { Match } from '@/lib/api/types'
-
-type MatchPhase = Match['phase']
-
-const ROUND_TO_PHASE: Record<string, MatchPhase> = {
-  'Round of 32': '32nd',
-  'Round of 16': '16th',
-  'Quarter-finals': '8th',
-  'Semi-finals': 'semi',
-  '3rd Place Final': '3rd_place',
-  '3rd Place': '3rd_place',
-  Final: 'final',
-}
-
-function resolveFlag(teamName: string): string | null {
-  return ALL_COPA_TEAMS.find((t) => t.name === teamName)?.code ?? null
-}
-
-function parsePhaseAndGroup(
-  round: string,
-  group: string | null
-): { phase: MatchPhase; group: string | null } {
-  if (round.startsWith('Group Stage')) {
-    return {
-      phase: 'group',
-      group: group ? group.replace(/^Group /, '') : null,
-    }
-  }
-  return { phase: ROUND_TO_PHASE[round] ?? 'group', group: null }
-}
 
 export async function POST(request: NextRequest) {
   const start = Date.now()
@@ -59,33 +28,37 @@ export async function POST(request: NextRequest) {
   try {
     const fixtures = await fetchWorldCupFixtures()
 
-    const rows = fixtures.map((f) => {
-      const { phase, group } = parsePhaseAndGroup(f.league.round, f.league.group)
-      return {
-        external_id: String(f.fixture.id),
-        home_team: f.teams.home.name,
-        away_team: f.teams.away.name,
-        home_flag: resolveFlag(f.teams.home.name),
-        away_flag: resolveFlag(f.teams.away.name),
-        match_date: f.fixture.date,
-        phase,
-        group,
-        venue: f.fixture.venue.name,
-        city: f.fixture.venue.city,
-        status: mapFixtureStatus(f.fixture.status.short),
-        home_score: f.goals.home ?? null,
-        away_score: f.goals.away ?? null,
-      }
-    })
+    const rows = fixtures.map(mapOpenfootballMatch)
 
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     )
 
+    // Manually-controlled matches (ADR-008/ADR-004) are protected from automatic
+    // overwrite. Read their external_ids and exclude those rows from the upsert
+    // set so an operator's correction survives the hourly run untouched.
+    const { data: manualRows, error: manualError } = await supabase
+      .from('matches')
+      .select('external_id')
+      .eq('is_manual', true)
+
+    if (manualError) {
+      throw new Error(`DB manual read failed: ${manualError.message}`)
+    }
+
+    const manualIds = new Set(
+      (manualRows ?? [])
+        .map((r) => r.external_id as string | null)
+        .filter((id): id is string => id != null)
+    )
+
+    const rowsToUpsert = rows.filter((r) => !manualIds.has(r.external_id))
+    const skipped = rows.length - rowsToUpsert.length
+
     const { error: upsertError } = await supabase
       .from('matches')
-      .upsert(rows, { onConflict: 'external_id' })
+      .upsert(rowsToUpsert, { onConflict: 'external_id' })
 
     if (upsertError) {
       throw new Error(`DB upsert failed: ${upsertError.message}`)
@@ -100,8 +73,10 @@ export async function POST(request: NextRequest) {
       throw new Error(`DB delete failed: ${deleteError.message}`)
     }
 
-    const finishedCount = rows.filter((r) => r.status === 'finished').length
-    const scoredMatches = rows.filter((r) => r.home_score !== null && r.away_score !== null).length
+    const finishedCount = rowsToUpsert.filter((r) => r.status === 'finished').length
+    const scoredMatches = rowsToUpsert.filter(
+      (r) => r.home_score !== null && r.away_score !== null
+    ).length
     console.log(
       JSON.stringify({
         timestamp: new Date().toISOString(),
@@ -111,6 +86,7 @@ export async function POST(request: NextRequest) {
         event: 'sync_result_ingested',
         finished_count: finishedCount,
         scored_matches: scoredMatches,
+        skipped_manual: skipped,
       })
     )
 
@@ -124,13 +100,14 @@ export async function POST(request: NextRequest) {
         endpoint: '/api/admin/sync-matches',
         method: 'POST',
         event: 'sync_complete',
-        upserted: rows.length,
+        upserted: rowsToUpsert.length,
+        skipped_manual: skipped,
         duration_ms: duration,
       })
     )
 
     return NextResponse.json(
-      formatSuccess({ upserted: rows.length, skipped: 0 }),
+      formatSuccess({ upserted: rowsToUpsert.length, skipped }),
       { status: 200 }
     )
   } catch (err) {
@@ -141,7 +118,7 @@ export async function POST(request: NextRequest) {
         level: 'error',
         endpoint: '/api/admin/sync-matches',
         method: 'POST',
-        event: 'api_football_error',
+        event: 'ingestion_error',
         duration_ms: duration,
         error: err instanceof Error ? err.message : 'unknown',
       })

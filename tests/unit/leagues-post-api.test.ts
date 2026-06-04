@@ -161,3 +161,37 @@ describe('POST /api/leagues — prize_pool validation', () => {
     expect(insertCall?.prize_pool).toBeNull()
   })
 })
+
+describe('POST /api/leagues — name HTML/markup rejection', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('returns 400 INVALID_BODY when name contains an HTML tag', async () => {
+    vi.mocked(getSupabaseServerClient).mockResolvedValue(makeSupabase() as never)
+    const res = await POST(
+      makeRequest({ name: '<img src=x onerror=alert(1)>', access_type: 'open' })
+    )
+    expect(res.status).toBe(400)
+    const json = await res.json()
+    expect(json.code).toBe('INVALID_BODY')
+  })
+
+  it('returns 400 INVALID_BODY when name contains a lone angle bracket', async () => {
+    vi.mocked(getSupabaseServerClient).mockResolvedValue(makeSupabase() as never)
+    const res = await POST(makeRequest({ name: 'Liga 1 < Liga 2', access_type: 'open' }))
+    expect(res.status).toBe(400)
+    const json = await res.json()
+    expect(json.code).toBe('INVALID_BODY')
+  })
+
+  it('accepts a normal name without angle brackets', async () => {
+    vi.mocked(getSupabaseServerClient).mockResolvedValue(makeSupabase() as never)
+    const res = await POST(makeRequest({ name: 'Bolão da Firma', access_type: 'open' }))
+    expect(res.status).toBe(201)
+  })
+})

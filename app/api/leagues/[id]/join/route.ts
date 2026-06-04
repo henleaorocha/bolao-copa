@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 import { getSupabaseServerClient } from '@/lib/supabase/client'
 import { formatSuccess, formatError } from '@/lib/api/responses'
 import type { LeagueSummary } from '@/lib/api/types'
@@ -37,8 +38,16 @@ export async function POST(
     const bodyObj = body && typeof body === 'object' ? (body as { token?: unknown }) : {}
     const token = bodyObj.token
 
-    // Check if league exists
-    const leagueResult = await supabase
+    // Look up the league with the service role: a PRIVATE league is invisible to
+    // a non-member under RLS, so reading it (and its invite_token) with the
+    // user's client returns 404 and invites can never be accepted. The token is
+    // the secret that authorises this read (migration 11 / ADR-003).
+    const adminClient = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      { auth: { autoRefreshToken: false, persistSession: false } }
+    )
+    const leagueResult = await adminClient
       .from('leagues')
       .select('id, name, access_type, logo_url, member_count, invite_token')
       .eq('id', leagueId)
@@ -78,7 +87,10 @@ export async function POST(
       }
     }
 
-    // Insert user as member
+    // Insert user as member. No .select() on purpose: the SELECT policy
+    // (is_member_of_league, STABLE) evaluates against the pre-insert snapshot, so
+    // RETURNING the just-inserted row is filtered and PostgREST reports it as an
+    // RLS violation. The inserted row isn't needed — the summary is re-read below.
     const insertResult = await supabase
       .from('league_members')
       .insert({
@@ -86,8 +98,6 @@ export async function POST(
         user_id: user.id,
         role: 'member',
       })
-      .select()
-      .single()
 
     if (insertResult.error) {
       console.error('[api/leagues/[id]/join] Erro ao inserir membro:', insertResult.error?.message)

@@ -166,6 +166,16 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Rejeita marcação HTML/script no nome. Defesa em profundidade: o React
+    // já escapa no JSX, mas o nome pode ser reaproveitado em contextos que
+    // renderizam HTML (e-mails, notificações, integrações futuras).
+    if (/[<>]/.test(trimmedName)) {
+      return NextResponse.json(
+        formatError('INVALID_BODY', 'Nome não pode conter os caracteres < ou >', 400),
+        { status: 400 }
+      )
+    }
+
     // Validate access_type
     if (!access_type || typeof access_type !== 'string' || !['open', 'private'].includes(access_type)) {
       return NextResponse.json(

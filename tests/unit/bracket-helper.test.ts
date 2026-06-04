@@ -3,9 +3,10 @@ import { buildBracketResponse, PHASE_MULTIPLIERS, PHASE_LABELS } from '@/lib/bra
 import { BRACKET_SKELETON, PHASE_ORDER } from '@/lib/bracket-skeleton'
 import type { Match } from '@/lib/api/types'
 
-// R32 slot #1 calendar key (must match bracket-skeleton.ts exactly)
+// R32 slot #1 keys to openfootball num 73 → external_id wc2026-73 (ADR-007).
+const R32_SLOT1_EXTERNAL_ID = 'wc2026-73'
 const R32_SLOT1_DATE = '2026-06-28T21:00:00Z'
-const R32_SLOT1_VENUE = 'MetLife Stadium'
+const R32_SLOT1_VENUE = 'Los Angeles (Inglewood)' // openfootball ground (a city)
 
 // nowMs values for deterministic state control
 // "long before": 24h before R32 slot #1 kickoff → slot is open
@@ -16,7 +17,7 @@ const NOW_LOCKED = new Date('2026-06-28T20:31:00Z').getTime()
 function makeMatch(overrides: Partial<Match> = {}): Match {
   return {
     id: 'match-1',
-    external_id: null,
+    external_id: R32_SLOT1_EXTERNAL_ID,
     home_team: 'Brasil',
     away_team: 'Argentina',
     home_flag: 'br',
@@ -145,8 +146,15 @@ describe('buildBracketResponse — TBD/placeholder team strings stay placeholder
     expect(slot.awayTeam).toBeNull()
   })
 
-  it('slot stays placeholder when match venue does not resolve to any slot', () => {
-    const match = makeMatch({ venue: 'Unknown Stadium' })
+  it('slot stays placeholder when external_id does not resolve to any slot', () => {
+    const match = makeMatch({ external_id: 'wc2026-A-Brasil-Argentina' })
+    const result = buildBracketResponse([match], [], NOW_OPEN)
+    const allSlots = result.phases.flatMap((p) => p.slots)
+    expect(allSlots.every((s) => s.state === 'placeholder')).toBe(true)
+  })
+
+  it('slot stays placeholder when external_id is null', () => {
+    const match = makeMatch({ external_id: null })
     const result = buildBracketResponse([match], [], NOW_OPEN)
     const allSlots = result.phases.flatMap((p) => p.slots)
     expect(allSlots.every((s) => s.state === 'placeholder')).toBe(true)
@@ -170,16 +178,15 @@ describe('buildBracketResponse — newlyUnlockedPhase logic', () => {
   })
 
   it('newlyUnlockedPhase names the latest phase in PHASE_ORDER with an open un-bet match', () => {
-    // R32 slot #1: date=2026-06-28T21:00:00Z, venue=MetLife Stadium
-    // Semi slot #2: date=2026-07-17T21:00:00Z, venue=MetLife Stadium
+    // R32 slot #1: external_id wc2026-73 ; Semi slot #2: external_id wc2026-102
     const SEMI_SLOT2_DATE = '2026-07-17T21:00:00Z'
     const nowMs = new Date('2026-06-01T00:00:00Z').getTime() // well before both kickoffs
 
     const r32Match: Match = makeMatch({ id: 'match-r32' })
     const semiMatch: Match = makeMatch({
       id: 'match-semi',
+      external_id: 'wc2026-102',
       match_date: SEMI_SLOT2_DATE,
-      venue: 'MetLife Stadium',
       phase: 'semi',
     })
 

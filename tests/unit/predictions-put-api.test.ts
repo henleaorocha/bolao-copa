@@ -229,6 +229,28 @@ describe('PUT /api/leagues/[id]/predictions/[matchId]', () => {
     expect(json.code).toBe('INVALID_BODY')
   })
 
+  it('returns 400 INVALID_BODY when home_score exceeds the upper bound', async () => {
+    vi.mocked(getSupabaseServerClient).mockResolvedValue(makeSupabase() as never)
+    const res = await PUT(makeRequest({ home_score: 999999, away_score: 0 }), makeParams())
+    expect(res.status).toBe(400)
+    const json = await res.json()
+    expect(json.code).toBe('INVALID_BODY')
+  })
+
+  it('returns 400 INVALID_BODY when away_score exceeds the upper bound', async () => {
+    vi.mocked(getSupabaseServerClient).mockResolvedValue(makeSupabase() as never)
+    const res = await PUT(makeRequest({ home_score: 1, away_score: 100 }), makeParams())
+    expect(res.status).toBe(400)
+    const json = await res.json()
+    expect(json.code).toBe('INVALID_BODY')
+  })
+
+  it('accepts a score exactly at the upper bound (99)', async () => {
+    vi.mocked(getSupabaseServerClient).mockResolvedValue(makeSupabase() as never)
+    const res = await PUT(makeRequest({ home_score: 99, away_score: 99 }), makeParams())
+    expect(res.status).toBe(200)
+  })
+
   it('returns 404 MATCH_NOT_FOUND when match does not exist', async () => {
     vi.mocked(getSupabaseServerClient).mockResolvedValue(
       makeSupabase({

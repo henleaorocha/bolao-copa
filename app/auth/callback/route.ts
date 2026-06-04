@@ -16,8 +16,10 @@ export async function GET(request: NextRequest) {
             return cookieStore.getAll()
           },
           setAll(cookiesToSet) {
+            // httpOnly forçado: o token de auth (que embute o provider_token do
+            // Google) não deve ser legível por document.cookie.
             cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
+              cookieStore.set(name, value, { ...options, httpOnly: true })
             )
           },
         },

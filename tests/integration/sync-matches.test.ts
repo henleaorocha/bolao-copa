@@ -8,9 +8,10 @@ import { describe, it, expect, vi, beforeAll, afterAll, beforeEach } from 'vites
 import { NextRequest } from 'next/server'
 import { adminClient } from '../fixtures/factories'
 
-vi.mock('@/lib/football-api', () => ({
-  fetchWorldCupFixtures: vi.fn(),
-}))
+vi.mock('@/lib/football-api', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/football-api')>()
+  return { ...actual, fetchWorldCupFixtures: vi.fn() }
+})
 
 vi.mock('next/cache', () => ({
   revalidateTag: vi.fn(),
@@ -18,7 +19,7 @@ vi.mock('next/cache', () => ({
 
 import { POST } from '@/app/api/admin/sync-matches/route'
 import { fetchWorldCupFixtures } from '@/lib/football-api'
-import type { ApiFootballFixture } from '@/lib/football-api'
+import type { OpenfootballMatch } from '@/lib/football-api'
 
 const HAS_SERVICE_KEY = Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY)
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ?? ''
@@ -30,30 +31,30 @@ function makeRequest(): NextRequest {
   })
 }
 
-function makeFixture(id: number): ApiFootballFixture {
+// Knockout match → deterministic external_id `wc2026-<num>`, so the test can
+// target a unique row without depending on numeric fixture ids.
+function makeKnockout(num: number, overrides: Partial<OpenfootballMatch> = {}): OpenfootballMatch {
   return {
-    fixture: {
-      id,
-      date: '2026-06-14T18:00:00Z',
-      venue: { name: 'Test Stadium', city: 'Test City' },
-      status: { short: 'NS' },
-    },
-    league: { round: 'Group Stage - 1', group: 'Group A' },
-    teams: {
-      home: { name: 'Brasil', logo: '' },
-      away: { name: 'Argentina', logo: '' },
-    },
-    goals: { home: null, away: null },
+    round: 'Round of 32',
+    num,
+    date: '2026-06-28',
+    time: '16:00 UTC-4',
+    team1: 'Brazil',
+    team2: 'Argentina',
+    ground: 'Test City',
+    ...overrides,
   }
 }
 
 describe.skipIf(!HAS_SERVICE_KEY)('POST /api/admin/sync-matches — integration', () => {
-  const EXTERNAL_ID = `sync-test-${Date.now()}`
-  const insertedExternalIds: string[] = []
+  const UNIQUE_NUM = (Date.now() % 100000) + 900000
+  const EXTERNAL_ID = `wc2026-${UNIQUE_NUM}`
+  const insertedExternalIds: string[] = [EXTERNAL_ID]
   let nullMatchIds: string[] = []
 
   beforeAll(() => {
     vi.spyOn(console, 'log').mockImplementation(() => {})
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
     vi.spyOn(console, 'error').mockImplementation(() => {})
   })
 
@@ -64,25 +65,14 @@ describe.skipIf(!HAS_SERVICE_KEY)('POST /api/admin/sync-matches — integration'
     if (insertedExternalIds.length > 0) {
       await admin.from('matches').delete().in('external_id', insertedExternalIds)
     }
-
-    // Restore any null-id matches we deleted in the cleanup test
-    // (they were already cleaned up in the test; no further action needed)
   })
 
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
-  it('upserts a fixture and returns 200 with upserted: 1', async () => {
-    const fixture = makeFixture(1)
-    // Override fixture id to use our unique string as external_id
-    const customFixture: ApiFootballFixture = {
-      ...fixture,
-      fixture: { ...fixture.fixture, id: parseInt(EXTERNAL_ID.replace(/\D/g, '').slice(-8), 10) || 99001 },
-    }
-
-    vi.mocked(fetchWorldCupFixtures).mockResolvedValue([customFixture])
-    insertedExternalIds.push(String(customFixture.fixture.id))
+  it('upserts a match and returns 200 with upserted: 1', async () => {
+    vi.mocked(fetchWorldCupFixtures).mockResolvedValue([makeKnockout(UNIQUE_NUM)])
 
     const res = await POST(makeRequest())
 
@@ -96,7 +86,7 @@ describe.skipIf(!HAS_SERVICE_KEY)('POST /api/admin/sync-matches — integration'
     const { data, error } = await admin
       .from('matches')
       .select('external_id, home_team, away_team, home_flag, away_flag, phase, group')
-      .eq('external_id', String(customFixture.fixture.id))
+      .eq('external_id', EXTERNAL_ID)
       .single()
 
     expect(error).toBeNull()
@@ -105,36 +95,25 @@ describe.skipIf(!HAS_SERVICE_KEY)('POST /api/admin/sync-matches — integration'
     expect(data!.away_team).toBe('Argentina')
     expect(data!.home_flag).toBe('br')
     expect(data!.away_flag).toBe('ar')
-    expect(data!.phase).toBe('group')
-    expect(data!.group).toBe('A')
+    expect(data!.phase).toBe('32nd')
+    expect(data!.group).toBeNull()
   })
 
-  it('second POST with same fixture is idempotent (row count stays 1)', async () => {
+  it('second POST with same match is idempotent (row count stays 1)', async () => {
     const admin = adminClient()
-    const externalId = insertedExternalIds[0]
 
-    // Get fixture id from the previously inserted row
     const { data: existing } = await admin
       .from('matches')
       .select('external_id')
-      .eq('external_id', externalId)
+      .eq('external_id', EXTERNAL_ID)
       .single()
 
     expect(existing).not.toBeNull()
 
-    // Build fixture with same external_id
-    const fixtureId = parseInt(externalId, 10)
-    const fixture: ApiFootballFixture = {
-      fixture: { id: fixtureId, date: '2026-06-14T19:00:00Z', venue: { name: 'New Stadium', city: 'New City' }, status: { short: 'NS' } },
-      league: { round: 'Group Stage - 2', group: 'Group B' },
-      teams: {
-        home: { name: 'Brasil', logo: '' },
-        away: { name: 'França', logo: '' },
-      },
-      goals: { home: null, away: null },
-    }
-
-    vi.mocked(fetchWorldCupFixtures).mockResolvedValue([fixture])
+    // Same external_id (same num), different away team + ground → updated on conflict.
+    vi.mocked(fetchWorldCupFixtures).mockResolvedValue([
+      makeKnockout(UNIQUE_NUM, { team2: 'France', ground: 'New City' }),
+    ])
 
     const res = await POST(makeRequest())
 
@@ -142,14 +121,12 @@ describe.skipIf(!HAS_SERVICE_KEY)('POST /api/admin/sync-matches — integration'
     const json = await res.json()
     expect(json.data.upserted).toBe(1)
 
-    // Verify exactly one row exists with the external_id
     const { data: rows } = await admin
       .from('matches')
       .select('external_id, away_team, city')
-      .eq('external_id', externalId)
+      .eq('external_id', EXTERNAL_ID)
 
     expect(rows).toHaveLength(1)
-    // Fields updated on conflict
     expect(rows![0].away_team).toBe('França')
     expect(rows![0].city).toBe('New City')
   })
@@ -177,19 +154,11 @@ describe.skipIf(!HAS_SERVICE_KEY)('POST /api/admin/sync-matches — integration'
     expect(before).toHaveLength(2)
 
     // Run sync — should delete all external_id IS NULL rows
-    const uniqueId = Date.now() + 99002
+    const otherNum = UNIQUE_NUM + 1
+    insertedExternalIds.push(`wc2026-${otherNum}`)
     vi.mocked(fetchWorldCupFixtures).mockResolvedValue([
-      {
-        fixture: { id: uniqueId, date: '2026-06-20T18:00:00Z', venue: { name: 'V', city: 'C' }, status: { short: 'NS' } },
-        league: { round: 'Group Stage - 1', group: 'Group C' },
-        teams: {
-          home: { name: 'Brasil', logo: '' },
-          away: { name: 'Alemanha', logo: '' },
-        },
-        goals: { home: null, away: null },
-      },
+      makeKnockout(otherNum, { team1: 'Brazil', team2: 'Germany', ground: 'C' }),
     ])
-    insertedExternalIds.push(String(uniqueId))
 
     const res = await POST(makeRequest())
     expect(res.status).toBe(200)
@@ -201,5 +170,65 @@ describe.skipIf(!HAS_SERVICE_KEY)('POST /api/admin/sync-matches — integration'
       .in('id', nullMatchIds)
 
     expect(after).toHaveLength(0)
+  })
+
+  it('leaves a manually-controlled match untouched while upserting the rest', async () => {
+    const admin = adminClient()
+
+    const manualNum = UNIQUE_NUM + 2
+    const otherNum = UNIQUE_NUM + 3
+    const manualId = `wc2026-${manualNum}`
+    const otherId = `wc2026-${otherNum}`
+    insertedExternalIds.push(manualId, otherId)
+
+    // Seed a manual correction the operator entered: 5-0, finished, is_manual.
+    const { error: seedErr } = await admin.from('matches').upsert(
+      {
+        external_id: manualId,
+        home_team: 'Brasil',
+        away_team: 'Argentina',
+        match_date: '2026-06-29T16:00:00Z',
+        phase: '32nd',
+        status: 'finished',
+        home_score: 5,
+        away_score: 0,
+        is_manual: true,
+        manual_updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'external_id' }
+    )
+    expect(seedErr).toBeNull()
+
+    // Sync sees the same match with a DIFFERENT (stale) score plus a fresh one.
+    vi.mocked(fetchWorldCupFixtures).mockResolvedValue([
+      makeKnockout(manualNum, { team1: 'Brazil', team2: 'Argentina', score: { ft: [1, 1] } }),
+      makeKnockout(otherNum, { team1: 'Brazil', team2: 'Germany', score: { ft: [2, 0] } }),
+    ])
+
+    const res = await POST(makeRequest())
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    expect(json.data.skipped).toBe(1)
+    expect(json.data.upserted).toBe(1)
+
+    // Manual row preserved exactly (not overwritten by the stale 1-1).
+    const { data: manual } = await admin
+      .from('matches')
+      .select('home_score, away_score, status, is_manual')
+      .eq('external_id', manualId)
+      .single()
+    expect(manual!.home_score).toBe(5)
+    expect(manual!.away_score).toBe(0)
+    expect(manual!.is_manual).toBe(true)
+
+    // Non-manual row upserted as usual.
+    const { data: other } = await admin
+      .from('matches')
+      .select('home_score, away_score, is_manual')
+      .eq('external_id', otherId)
+      .single()
+    expect(other!.home_score).toBe(2)
+    expect(other!.away_score).toBe(0)
+    expect(other!.is_manual).toBe(false)
   })
 })

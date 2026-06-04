@@ -18,7 +18,7 @@ import { POST } from '@/app/api/admin/sync-matches/route'
 import { fetchWorldCupFixtures } from '@/lib/football-api'
 import { createClient } from '@supabase/supabase-js'
 import { revalidateTag } from 'next/cache'
-import type { ApiFootballFixture } from '@/lib/football-api'
+import type { OpenfootballMatch } from '@/lib/football-api'
 
 const SERVICE_KEY = 'test-service-key-abc'
 
@@ -33,21 +33,20 @@ function makeRequest(authHeader?: string): NextRequest {
   })
 }
 
-function makeFixture(
-  id: number,
-  homeName: string,
-  awayName: string,
-  round = 'Group Stage - 1',
-  group: string | null = 'Group A'
-): ApiFootballFixture {
+function makeMatch(
+  team1: string,
+  team2: string,
+  overrides: Partial<OpenfootballMatch> = {}
+): OpenfootballMatch {
   return {
-    fixture: { id, date: '2026-06-14T18:00:00Z', venue: { name: 'MetLife', city: 'East Rutherford' }, status: { short: 'NS' } },
-    league: { round, group },
-    teams: {
-      home: { name: homeName, logo: '' },
-      away: { name: awayName, logo: '' },
-    },
-    goals: { home: null, away: null },
+    round: 'Matchday 1',
+    date: '2026-06-14',
+    time: '13:00 UTC-6',
+    team1,
+    team2,
+    group: 'Group A',
+    ground: 'Mexico City',
+    ...overrides,
   }
 }
 
@@ -72,6 +71,7 @@ describe('POST /api/admin/sync-matches', () => {
     process.env.SUPABASE_SERVICE_ROLE_KEY = SERVICE_KEY
     process.env.NEXT_PUBLIC_SUPABASE_URL = 'http://test-supabase.local'
     vi.spyOn(console, 'log').mockImplementation(() => {})
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
     vi.spyOn(console, 'error').mockImplementation(() => {})
   })
 
@@ -94,10 +94,10 @@ describe('POST /api/admin/sync-matches', () => {
     expect(json.code).toBe('UNAUTHORIZED')
   })
 
-  it('calls upsert with 2 rows when fetchWorldCupFixtures returns 2 fixtures', async () => {
+  it('calls upsert with 2 rows when fetchWorldCupFixtures returns 2 matches', async () => {
     vi.mocked(fetchWorldCupFixtures).mockResolvedValue([
-      makeFixture(1, 'Brasil', 'Argentina'),
-      makeFixture(2, 'França', 'Alemanha'),
+      makeMatch('Mexico', 'South Africa', { group: 'Group A' }),
+      makeMatch('Germany', 'Ecuador', { group: 'Group E' }),
     ])
 
     const { from, upsertFn } = makeSupabase()
@@ -108,8 +108,8 @@ describe('POST /api/admin/sync-matches', () => {
     expect(res.status).toBe(200)
     expect(upsertFn).toHaveBeenCalledWith(
       expect.arrayContaining([
-        expect.objectContaining({ external_id: '1' }),
-        expect.objectContaining({ external_id: '2' }),
+        expect.objectContaining({ external_id: 'wc2026-A-México-África do Sul' }),
+        expect.objectContaining({ external_id: 'wc2026-E-Alemanha-Equador' }),
       ]),
       { onConflict: 'external_id' }
     )
@@ -119,7 +119,7 @@ describe('POST /api/admin/sync-matches', () => {
 
   it('calls DELETE WHERE external_id IS NULL after successful upsert', async () => {
     vi.mocked(fetchWorldCupFixtures).mockResolvedValue([
-      makeFixture(1, 'Brasil', 'Argentina'),
+      makeMatch('Mexico', 'South Africa'),
     ])
 
     const { from, isFn } = makeSupabase()
@@ -132,8 +132,8 @@ describe('POST /api/admin/sync-matches', () => {
 
   it('returns { status: success, data: { upserted: 2, skipped: 0 } } on success', async () => {
     vi.mocked(fetchWorldCupFixtures).mockResolvedValue([
-      makeFixture(1, 'Brasil', 'Argentina'),
-      makeFixture(2, 'França', 'Alemanha'),
+      makeMatch('Mexico', 'South Africa'),
+      makeMatch('Germany', 'Ecuador', { group: 'Group E' }),
     ])
 
     const { from } = makeSupabase()
@@ -147,7 +147,7 @@ describe('POST /api/admin/sync-matches', () => {
   })
 
   it('returns 500 when fetchWorldCupFixtures throws', async () => {
-    vi.mocked(fetchWorldCupFixtures).mockRejectedValue(new Error('API Football down'))
+    vi.mocked(fetchWorldCupFixtures).mockRejectedValue(new Error('openfootball down'))
 
     const res = await POST(makeRequest(`Bearer ${SERVICE_KEY}`))
 
@@ -158,7 +158,7 @@ describe('POST /api/admin/sync-matches', () => {
 
   it('maps team name found in ALL_COPA_TEAMS to correct flag code; unknown team maps to null', async () => {
     vi.mocked(fetchWorldCupFixtures).mockResolvedValue([
-      makeFixture(1, 'Brasil', 'Unknown FC'),
+      makeMatch('Brazil', 'Unknown FC', { group: 'Group C' }),
     ])
 
     const { from, upsertFn } = makeSupabase()
@@ -171,9 +171,9 @@ describe('POST /api/admin/sync-matches', () => {
     expect(rows[0].away_flag).toBeNull()
   })
 
-  it('maps Group Stage round to phase:group and extracts group letter from league.group', async () => {
+  it('maps a Matchday round to phase:group and extracts the group letter', async () => {
     vi.mocked(fetchWorldCupFixtures).mockResolvedValue([
-      makeFixture(1, 'Brasil', 'Argentina', 'Group Stage - 1', 'Group A'),
+      makeMatch('Mexico', 'South Africa', { round: 'Matchday 1', group: 'Group A' }),
     ])
 
     const { from, upsertFn } = makeSupabase()
@@ -188,7 +188,7 @@ describe('POST /api/admin/sync-matches', () => {
 
   it('calls revalidateTag("fixtures") after a successful sync', async () => {
     vi.mocked(fetchWorldCupFixtures).mockResolvedValue([
-      makeFixture(1, 'Brasil', 'Argentina'),
+      makeMatch('Mexico', 'South Africa'),
     ])
 
     const { from } = makeSupabase()
@@ -202,7 +202,7 @@ describe('POST /api/admin/sync-matches', () => {
 
   it('returns 500 when Supabase upsert fails', async () => {
     vi.mocked(fetchWorldCupFixtures).mockResolvedValue([
-      makeFixture(1, 'Brasil', 'Argentina'),
+      makeMatch('Mexico', 'South Africa'),
     ])
 
     const { from } = makeSupabase({ upsertError: { message: 'db error' } })

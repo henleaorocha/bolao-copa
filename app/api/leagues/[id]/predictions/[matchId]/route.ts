@@ -5,6 +5,11 @@ import { isConfirmedMatchup } from '@/lib/bracket-skeleton'
 
 const KNOCKOUT_PHASES = new Set(['32nd', '16th', '8th', 'semi', '3rd_place', 'final'])
 
+// Teto defensivo para placares de palpite. Nenhum jogo real chega perto disso;
+// o limite evita overflow em cálculos de pontuação e quebra de layout na UI
+// com valores absurdos (ex.: 999999 x 999999).
+const MAX_SCORE = 99
+
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string; matchId: string }> }
@@ -70,10 +75,12 @@ export async function PUT(
       !Number.isInteger(home_score) ||
       !Number.isInteger(away_score) ||
       home_score < 0 ||
-      away_score < 0
+      away_score < 0 ||
+      home_score > MAX_SCORE ||
+      away_score > MAX_SCORE
     ) {
       return NextResponse.json(
-        formatError('INVALID_BODY', 'home_score e away_score devem ser inteiros não-negativos', 400),
+        formatError('INVALID_BODY', `home_score e away_score devem ser inteiros entre 0 e ${MAX_SCORE}`, 400),
         { status: 400 }
       )
     }

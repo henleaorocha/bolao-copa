@@ -1,8 +1,12 @@
 import { describe, it, expect } from 'vitest'
+import * as skeleton from '@/lib/bracket-skeleton'
 import {
   BRACKET_SKELETON,
   PHASE_ORDER,
-  resolveSlot,
+  SLOT_FEEDS,
+  parsePlaceholder,
+  slotForExternalId,
+  slotForNum,
   isConfirmedMatchup,
   type KnockoutPhase,
 } from '@/lib/bracket-skeleton'
@@ -29,27 +33,30 @@ describe('BRACKET_SKELETON structural validation', () => {
 
   it('has unique (phase, pos) pairs across the skeleton', () => {
     const keys = BRACKET_SKELETON.map((s) => `${s.phase}:${s.pos}`)
-    const unique = new Set(keys)
-    expect(unique.size).toBe(BRACKET_SKELETON.length)
+    expect(new Set(keys).size).toBe(BRACKET_SKELETON.length)
   })
 
-  it('has unique calendarKey (date, venue) pairs', () => {
-    const keys = BRACKET_SKELETON.map((s) => `${s.calendarKey.date}|${s.calendarKey.venue}`)
-    const unique = new Set(keys)
-    expect(unique.size).toBe(BRACKET_SKELETON.length)
+  it('has unique external_id per slot', () => {
+    const ids = BRACKET_SKELETON.map((s) => s.externalId)
+    expect(new Set(ids).size).toBe(BRACKET_SKELETON.length)
   })
 
-  it('all feeds references resolve to existing (phase, pos) slots', () => {
-    const slotKeys = new Set(BRACKET_SKELETON.map((s) => `${s.phase}:${s.pos}`))
-    for (const slot of BRACKET_SKELETON) {
-      if (slot.feeds) {
-        const key = `${slot.feeds.phase}:${slot.feeds.pos}`
-        expect(
-          slotKeys.has(key),
-          `Slot ${slot.phase}#${slot.pos} feeds → ${key} which does not exist`
-        ).toBe(true)
-      }
-    }
+  it('carries openfootball num 73..102 on R32..SF and null on Final/3rd', () => {
+    const nums = BRACKET_SKELETON.filter((s) => s.num != null)
+      .map((s) => s.num as number)
+      .sort((a, b) => a - b)
+    expect(nums).toHaveLength(30)
+    expect(nums[0]).toBe(73)
+    expect(nums[nums.length - 1]).toBe(102)
+
+    const noNum = BRACKET_SKELETON.filter((s) => s.num == null)
+    expect(noNum.map((s) => s.phase).sort()).toEqual(['3rd_place', 'final'])
+  })
+
+  it('derives external_id as wc2026-<num> / -final / -3rd', () => {
+    expect(BRACKET_SKELETON.find((s) => s.num === 73)!.externalId).toBe('wc2026-73')
+    expect(BRACKET_SKELETON.find((s) => s.phase === 'final')!.externalId).toBe('wc2026-final')
+    expect(BRACKET_SKELETON.find((s) => s.phase === '3rd_place')!.externalId).toBe('wc2026-3rd')
   })
 
   it('PHASE_ORDER contains all 6 phases in render order', () => {
@@ -77,40 +84,146 @@ describe('BRACKET_SKELETON structural validation', () => {
       expect(slot.awayLabel.length).toBeGreaterThan(0)
     }
   })
+
+  it('every slot has parseable home and away sources', () => {
+    for (const slot of BRACKET_SKELETON) {
+      expect(slot.homeSource).not.toBeNull()
+      expect(slot.awaySource).not.toBeNull()
+    }
+  })
+
+  it('no longer exports resolveSlot, SLOT_BY_CALENDAR, or calendarKey', () => {
+    const mod = skeleton as Record<string, unknown>
+    expect(mod.resolveSlot).toBeUndefined()
+    expect(mod.SLOT_BY_CALENDAR).toBeUndefined()
+    expect(mod.calendarKey).toBeUndefined()
+    // and no slot carries the old (date, venue) calendar key
+    expect(BRACKET_SKELETON.every((s) => !('calendarKey' in s))).toBe(true)
+  })
 })
 
-describe('resolveSlot', () => {
-  it('returns the correct (phase, pos) for R32 #1 (MetLife Stadium, 2026-06-28T21:00:00Z)', () => {
-    const result = resolveSlot('2026-06-28T21:00:00Z', 'MetLife Stadium')
-    expect(result).toEqual({ phase: '32nd', pos: 1 })
+describe('parsePlaceholder — tolerant W##/#A/L## parsing', () => {
+  it('parses a group winner / runner-up code', () => {
+    expect(parsePlaceholder('1A')).toEqual({ kind: 'group', rank: 1, groups: ['A'], raw: '1A' })
+    expect(parsePlaceholder('2A')).toEqual({ kind: 'group', rank: 2, groups: ['A'], raw: '2A' })
   })
 
-  it('returns the correct slot for the Final', () => {
-    const result = resolveSlot('2026-07-19T21:00:00Z', 'MetLife Stadium')
-    expect(result).toEqual({ phase: 'final', pos: 1 })
+  it('parses a multi-group 3rd-place code', () => {
+    expect(parsePlaceholder('3A/B/C/D/F')).toEqual({
+      kind: 'group',
+      rank: 3,
+      groups: ['A', 'B', 'C', 'D', 'F'],
+      raw: '3A/B/C/D/F',
+    })
   })
 
-  it('returns the correct slot for the 3rd-place match', () => {
-    const result = resolveSlot('2026-07-18T20:00:00Z', 'SoFi Stadium')
-    expect(result).toEqual({ phase: '3rd_place', pos: 1 })
+  it('parses winner and loser match codes', () => {
+    expect(parsePlaceholder('W74')).toEqual({ kind: 'match', result: 'winner', num: 74, raw: 'W74' })
+    expect(parsePlaceholder('L101')).toEqual({
+      kind: 'match',
+      result: 'loser',
+      num: 101,
+      raw: 'L101',
+    })
   })
 
-  it('returns null for a completely unknown key', () => {
-    expect(resolveSlot('2099-01-01T00:00:00Z', 'Unknown Stadium')).toBeNull()
+  it('tolerates spelling variants (e.g. "Winner 74" vs "W74")', () => {
+    expect(parsePlaceholder('Winner 74')).toMatchObject({ kind: 'match', result: 'winner', num: 74 })
+    expect(parsePlaceholder('winner74')).toMatchObject({ kind: 'match', result: 'winner', num: 74 })
+    expect(parsePlaceholder('Vencedor 74')).toMatchObject({ kind: 'match', result: 'winner', num: 74 })
+    expect(parsePlaceholder('Loser 101')).toMatchObject({ kind: 'match', result: 'loser', num: 101 })
+    expect(parsePlaceholder('Perdedor 101')).toMatchObject({ kind: 'match', result: 'loser', num: 101 })
+    expect(parsePlaceholder(' 2A ')).toMatchObject({ kind: 'group', rank: 2, groups: ['A'] })
   })
 
-  it('returns null for correct date but wrong venue', () => {
-    expect(resolveSlot('2026-06-28T21:00:00Z', 'Wrong Stadium')).toBeNull()
+  it('returns null for an unrecognized code', () => {
+    expect(parsePlaceholder('Brasil')).toBeNull()
+    expect(parsePlaceholder('')).toBeNull()
+    expect(parsePlaceholder('4Z')).toBeNull()
+  })
+})
+
+describe('slotForExternalId / slotForNum', () => {
+  it('maps wc2026-73 to R32 slot pos 1', () => {
+    expect(slotForExternalId('wc2026-73')).toEqual({ phase: '32nd', pos: 1 })
   })
 
-  it('returns null for correct venue but wrong date', () => {
-    expect(resolveSlot('2026-01-01T00:00:00Z', 'MetLife Stadium')).toBeNull()
+  it('maps Final and 3rd-place external ids', () => {
+    expect(slotForExternalId('wc2026-final')).toEqual({ phase: 'final', pos: 1 })
+    expect(slotForExternalId('wc2026-3rd')).toEqual({ phase: '3rd_place', pos: 1 })
   })
 
-  it('resolves all 32 slots via their own calendarKey', () => {
+  it('returns null for an unknown external_id', () => {
+    expect(slotForExternalId('wc2026-A-Brasil-Argentina')).toBeNull()
+    expect(slotForExternalId('nope')).toBeNull()
+  })
+
+  it('resolves every slot via its own external_id', () => {
     for (const slot of BRACKET_SKELETON) {
-      const result = resolveSlot(slot.calendarKey.date, slot.calendarKey.venue)
-      expect(result).toEqual({ phase: slot.phase, pos: slot.pos })
+      expect(slotForExternalId(slot.externalId)).toEqual({ phase: slot.phase, pos: slot.pos })
+    }
+  })
+
+  it('maps openfootball num to its slot', () => {
+    expect(slotForNum(89)).toEqual({ phase: '16th', pos: 1 })
+    expect(slotForNum(101)).toEqual({ phase: 'semi', pos: 1 })
+    expect(slotForNum(999)).toBeNull()
+  })
+})
+
+describe('SLOT_FEEDS — downstream linkage from W##/L## sources', () => {
+  it('links winner of 74 to R16 pos 1 home (from W74)', () => {
+    expect(SLOT_FEEDS).toContainEqual({
+      num: 74,
+      result: 'winner',
+      phase: '16th',
+      pos: 1,
+      side: 'home',
+    })
+  })
+
+  it('links winner of 77 to R16 pos 1 away (from W77)', () => {
+    expect(SLOT_FEEDS).toContainEqual({
+      num: 77,
+      result: 'winner',
+      phase: '16th',
+      pos: 1,
+      side: 'away',
+    })
+  })
+
+  it('links loser of 101 to the 3rd-place match home side (from L101)', () => {
+    expect(SLOT_FEEDS).toContainEqual({
+      num: 101,
+      result: 'loser',
+      phase: '3rd_place',
+      pos: 1,
+      side: 'home',
+    })
+  })
+
+  it('a semi-final slot feeds BOTH the final (winner) and 3rd place (loser)', () => {
+    // num 101 (semi pos 1) → final pos1 home (W101) AND 3rd place home (L101)
+    const fromSf1 = SLOT_FEEDS.filter((f) => f.num === 101)
+    expect(fromSf1).toContainEqual({ num: 101, result: 'winner', phase: 'final', pos: 1, side: 'home' })
+    expect(fromSf1).toContainEqual({ num: 101, result: 'loser', phase: '3rd_place', pos: 1, side: 'home' })
+  })
+
+  it('every match feed points at the slot that the source num resolves to', () => {
+    for (const feed of SLOT_FEEDS) {
+      // the upstream num must resolve to a real slot
+      expect(slotForNum(feed.num)).not.toBeNull()
+      // the downstream (phase,pos) the feed names must be a real slot
+      const target = BRACKET_SKELETON.find((s) => s.phase === feed.phase && s.pos === feed.pos)
+      expect(target).toBeDefined()
+    }
+  })
+
+  it('the only group (entry) sources are in R32', () => {
+    for (const slot of BRACKET_SKELETON) {
+      const groupSided =
+        slot.homeSource?.kind === 'group' || slot.awaySource?.kind === 'group'
+      if (groupSided) expect(slot.phase).toBe('32nd')
     }
   })
 })

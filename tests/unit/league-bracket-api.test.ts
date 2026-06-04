@@ -11,9 +11,11 @@ import { getSupabaseServerClient } from '@/lib/supabase/client'
 const MOCK_USER = { id: 'user-abc' }
 const LEAGUE_ID = 'league-xyz'
 
-// R32 slot #1 calendar key (matches bracket-skeleton.ts)
+// R32 slot #1 keys to openfootball num 73 → external_id wc2026-73 (ADR-007).
+// The date is future-relative to "today" (2026-06-01) so the slot reads 'open'.
+const R32_SLOT1_EXTERNAL_ID = 'wc2026-73'
 const R32_SLOT1_DATE = '2026-06-28T21:00:00Z'
-const R32_SLOT1_VENUE = 'MetLife Stadium'
+const R32_SLOT1_VENUE = 'Los Angeles (Inglewood)' // openfootball ground (a city)
 
 function makeRequest(): NextRequest {
   return new NextRequest(`http://localhost/api/leagues/${LEAGUE_ID}/bracket`, { method: 'GET' })
@@ -26,7 +28,7 @@ function makeParams(id = LEAGUE_ID): { params: Promise<{ id: string }> } {
 function makeMatch(overrides: Record<string, unknown> = {}) {
   return {
     id: 'match-1',
-    external_id: null,
+    external_id: R32_SLOT1_EXTERNAL_ID,
     home_team: 'Brasil',
     away_team: 'Argentina',
     home_flag: 'br',
@@ -191,16 +193,11 @@ describe('GET /api/leagues/[id]/bracket', () => {
 
   describe('partial fill', () => {
     it('returns mixed states when some R32 slots are confirmed and rest are placeholder', async () => {
-      // Only match-1 resolves to R32 slot #1 (MetLife, 2026-06-28T21:00:00Z)
-      // All other R32 slots remain placeholder
+      // Only match-1 maps to R32 slot #1 (external_id wc2026-73).
+      // All other R32 slots remain placeholder. The future kickoff → 'open'.
       const confirmedMatch = makeMatch({
+        external_id: R32_SLOT1_EXTERNAL_ID,
         match_date: R32_SLOT1_DATE,
-        venue: R32_SLOT1_VENUE,
-        // Future kickoff — but resolveSlot uses exact date, so the slot resolves
-        // The state will be determined by Date comparison; R32_SLOT1_DATE is in the past relative to now
-        // so it will be 'locked' (within 1h threshold) since 2026-06-28 < now (2026-05-27 + 1h)
-        // Actually wait: the date 2026-06-28T21:00:00Z is in the future (today is 2026-05-27)
-        // So this slot should be 'open'
       })
 
       vi.mocked(getSupabaseServerClient).mockResolvedValue(

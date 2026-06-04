@@ -1,7 +1,7 @@
 import {
   BRACKET_SKELETON,
   PHASE_ORDER,
-  resolveSlot,
+  slotForExternalId,
   isConfirmedMatchup,
   type KnockoutPhase,
 } from '@/lib/bracket-skeleton'
@@ -76,11 +76,13 @@ export function buildBracketResponse(
   predictions: PredictionRow[],
   nowMs: number = Date.now()
 ): BracketResponse {
-  // Index matches by resolved (phase, pos) slot
+  // Index matches by their bracket slot, keyed on external_id (= wc2026-<num> /
+  // -final / -3rd). openfootball's `ground` is a city, so the old (date, venue)
+  // key could never match; external_id is the stable knockout key (ADR-007).
   const matchBySlot = new Map<string, Match>()
   for (const match of matches) {
-    if (!match.venue || !match.match_date) continue
-    const slot = resolveSlot(match.match_date, match.venue)
+    if (!match.external_id) continue
+    const slot = slotForExternalId(match.external_id)
     if (slot) {
       matchBySlot.set(`${slot.phase}:${slot.pos}`, match)
     }
