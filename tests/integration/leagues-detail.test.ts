@@ -170,7 +170,7 @@ describe.skipIf(!HAS_SERVICE_KEY)('League detail endpoints (GET, PATCH, DELETE)'
         position: 0,
         points: 0,
         guesses_made: 0,
-        guesses_total: 0,
+        guesses_total: 72,
         exact_scores: 0,
       })
 

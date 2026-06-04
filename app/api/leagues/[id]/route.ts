@@ -3,6 +3,7 @@ import { getSupabaseServerClient } from '@/lib/supabase/client'
 import { formatSuccess, formatError } from '@/lib/api/responses'
 import type { LeagueDetail, LeagueMember, RankingEntry, UserStats } from '@/lib/api/types'
 import { computeRanking } from '@/lib/ranking'
+import { GROUP_STAGE_MATCH_COUNT } from '@/lib/copa-teams'
 
 interface UserEmbed {
   full_name: string | null
@@ -225,7 +226,7 @@ export async function GET(
       position: currentUserEntry?.position ?? 0,
       points: currentUserEntry?.points ?? 0,
       guesses_made,
-      guesses_total: finishedMatchMap.size,
+      guesses_total: GROUP_STAGE_MATCH_COUNT,
       exact_scores: currentUserEntry?.exact_scores ?? 0,
     }
 

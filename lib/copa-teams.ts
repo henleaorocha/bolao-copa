@@ -65,6 +65,10 @@ export const ALL_COPA_TEAMS: CopaTeam[] = [
 
 export const VALID_TEAM_NAMES = new Set(ALL_COPA_TEAMS.map(t => t.name))
 
+// Total group-stage matches in the 2026 World Cup: 12 groups × 6 matches = 72.
+// Used as the fixed denominator for the "palpites · fase de grupos" stat.
+export const GROUP_STAGE_MATCH_COUNT = 72
+
 // Opening match (México × África do Sul) kickoff, stored as UTC like matches.match_date.
 // 2026-06-11T19:00:00Z = June 11, 2026 16:00 BRT (UTC-3).
 export const OPENING_MATCH_KICKOFF = new Date('2026-06-11T19:00:00.000Z')
