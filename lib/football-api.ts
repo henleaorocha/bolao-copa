@@ -13,7 +13,12 @@
 import { ALL_COPA_TEAMS, VALID_TEAM_NAMES } from '@/lib/copa-teams'
 import { OPENFOOTBALL_TO_PT, toPtName } from '@/lib/team-names'
 
+// Fonte real (produção). Pode ser sobrescrita por OPENFOOTBALL_URL para apontar
+// a ingestão a um mock local em validação manual (ver scripts/gen-mock.mjs +
+// scripts/serve-mock.mjs). Sem a env, o comportamento é idêntico ao de produção.
+const OPENFOOTBALL_MOCK_URL = process.env.OPENFOOTBALL_URL
 const OPENFOOTBALL_URL =
+  OPENFOOTBALL_MOCK_URL ??
   'https://raw.githubusercontent.com/openfootball/worldcup.json/master/2026/worldcup.json'
 
 export type MatchPhase =
@@ -213,9 +218,15 @@ export function mapOpenfootballMatch(m: OpenfootballMatch): MatchRow {
 // a non-array / `matches`-less body throws so the sync route reports the failure
 // rather than upserting garbage.
 export async function fetchWorldCupFixtures(): Promise<OpenfootballMatch[]> {
-  const res = await fetch(OPENFOOTBALL_URL, {
-    next: { revalidate: 3600, tags: ['fixtures'] },
-  })
+  // No modo mock desliga o cache para que cada regeneração do snapshot seja
+  // refletida no próximo sync sem reiniciar o dev. Em produção mantém o cache de
+  // 1h com a tag 'fixtures' (invalidada ao final do sync).
+  const res = await fetch(
+    OPENFOOTBALL_URL,
+    OPENFOOTBALL_MOCK_URL
+      ? { cache: 'no-store' }
+      : { next: { revalidate: 3600, tags: ['fixtures'] } }
+  )
 
   if (!res.ok) {
     throw new Error(`openfootball responded with ${res.status}`)
