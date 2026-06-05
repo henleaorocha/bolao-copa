@@ -5,7 +5,7 @@ Guia para validar o Bolão da Copa de ponta a ponta. Tem duas partes:
 1. **Como funciona por trás dos panos** — o que cada peça faz e em qual tabela o dado mora, pra você entender o que está testando.
 2. **Cenários de teste macro** — checklist do que precisa estar verde antes de divulgar.
 
-A última seção fala de como simular a API Football com um mock fiel ao formato real.
+A última seção (**Parte 3**) é o runbook pra **simular o torneio inteiro em níveis L0→L6** com um mock fiel ao openfootball — palpitar, entrar resultado, a próxima fase abrir, até o campeão.
 
 ---
 
@@ -192,12 +192,19 @@ Legenda de resultado: ✅ passou / ❌ falhou / ⏭️ bloqueado.
 
 ---
 
-## Parte 3 — Testar com um mock fiel do openfootball
+## Parte 3 — Simular o torneio inteiro com o gerador de mock (loop L0→L6)
 
-Hoje os testes já mockam `fetchWorldCupFixtures` (ver `tests/unit/sync-result-ingestion.test.ts`). Para a validação manual ponta-a-ponta há dois caminhos:
+Esta é a forma **ponta-a-ponta** de validar todo o ciclo: palpitar → entrar resultado → próxima fase desbloquear → palpitar de novo, do começo (tudo agendado) até o fim (campeão definido), **incluindo todo o mata-mata**. Foi construída e executada com sucesso em 2026-06-05.
 
-### Opção A — Substituir a função de fetch (mais simples, mock em código)
-O formato exato esperado é o tipo `OpenfootballMatch` de `lib/football-api.ts`:
+### 3.1 As três peças (já no repo)
+
+| Peça | O que faz |
+|---|---|
+| `lib/football-api.ts` (override por env) | `const OPENFOOTBALL_URL = process.env.OPENFOOTBALL_URL ?? '<url real>'`. **Sem a env, produção é idêntica.** Com a env, a ingestão consome um mock local; nesse modo o fetch usa `cache: 'no-store'`, então regenerar o snapshot reflete no próximo sync sem reiniciar nada. |
+| `scripts/gen-mock.mjs <0..6>` | Simula o torneio inteiro **uma vez, de forma determinística** (seed fixa) e emite `worldcup.mock.json` revelando o estado só até o nível pedido — imitando como o openfootball vai atualizando o mesmo arquivo conforme as fases acontecem. Imprime o campeão (sempre o mesmo). |
+| `scripts/serve-mock.mjs` | Serve o `worldcup.mock.json` em `http://localhost:5555/worldcup.mock.json` (fora do Next → não passa por `proxy.ts`/auth). Lê o arquivo a cada request. |
+
+O snapshot segue o tipo `OpenfootballMatch` de `lib/football-api.ts`:
 
 ```ts
 {
@@ -213,14 +220,87 @@ O formato exato esperado é o tipo `OpenfootballMatch` de `lib/football-api.ts`:
 }
 ```
 
-O endpoint chama `fetchWorldCupFixtures()` → mapeia cada jogo via `mapOpenfootballMatch` (deriva `status` a partir de `score`, combina `date`+offset em timestamptz, sintetiza `external_id`, normaliza EN → PT e resolve a bandeira) → upsert por `external_id`.
+O sync chama `fetchWorldCupFixtures()` → `mapOpenfootballMatch` (deriva `status` do `score`, combina `date`+offset em timestamptz, sintetiza `external_id`, normaliza EN→PT via `lib/team-names.ts`, resolve bandeira) → upsert por `external_id`. Placeholders de mata-mata (`2A`, `W74`, `L101`) ficam não-confirmados (`isConfirmedMatchup` falha) até os times reais chegarem — esperado.
 
-### Opção B — Servidor mock que responde igual ao openfootball (mais fiel)
-Subir um endpoint local que devolva `{ "matches": [ ...jogos... ] }` e apontar a URL de fetch pra ele. Isso exercita a chamada HTTP real, o parse e o cache (`revalidate: 3600, tags:['fixtures']`).
+### 3.2 O modelo de níveis
 
-> **Nota sobre nomes:** o adaptador já normaliza os nomes EN do openfootball para PT antes do upsert (`lib/team-names.ts`), então jogos com times reais liberam palpite e resolvem bandeira normalmente. Placeholders de mata-mata (`2A`, `W74`, `L101`) seguem como não-confirmados (`isConfirmedMatchup` falha) até os times reais chegarem — comportamento esperado.
+Cada nível **finaliza a fase anterior** (ganha `score.ft`) e **revela a próxima** com times reais sem placar (data no futuro → libera palpite). Os jogos de grupo são idênticos entre níveis — só ganham placar. Vencedores propagam coerentemente (`external_id` por `num`).
 
-Posso, no próximo passo, **montar esse mock pra você** — me diga qual opção prefere:
-- um **fixture JSON** + helper que injeta em `fetchWorldCupFixtures` (rápido, bom pra cenários 5/6/7), ou
-- um **mini servidor mock** respondendo no formato `{response:[...]}` (mais realista ponta-a-ponta), ou
-- um **script SQL de seed** que popula `matches` (grupos + mata-mata em PT, com placares finalizados) — o caminho mais direto pra destravar os cenários 5, 6 e 7 hoje, contornando a limitação do mata-mata.
+| Nível | Estado emitido | Sua ação na UI |
+|---|---|---|
+| **L0** | tudo agendado, mata-mata em placeholder | palpitar **grupos** + **apostar campeão** |
+| **L1** | grupos finalizados; **R32** com times reais | palpitar R32 |
+| **L2** | + R32 finalizado; **R16** revelado | palpitar R16 |
+| **L3** | + R16 finalizado; **quartas** reveladas | palpitar quartas |
+| **L4** | + quartas finalizadas; **semis** reveladas | palpitar semis |
+| **L5** | + semis finalizadas; **final + 3º** revelados | palpitar final/3º |
+| **L6** | tudo finalizado, **campeão/vice definidos** | conferir ranking + pontos da aposta |
+
+> **Determinístico:** com a seed atual o campeão é sempre **USA → EUA**, vice **Paraguay → Paraguai**, 3º **Spain → Espanha** (nomes EN no mock, PT na UI). Aposte **EUA campeão / Paraguai vice** no L0 pra cravar +50/+25 = **75 pts** no L6. Rodar `gen-mock` imprime esses nomes no resumo.
+
+### 3.3 ⚠️ Antes de começar — segurança
+
+- **O `.env.local` aponta para o banco de PRODUÇÃO** (`mpythoirxidkauerttak`). O sync grava nesse banco real. O teste é seguro **só enquanto a Copa não começou** (jogos reais ainda `scheduled`/sem placar) — assim o revert (sync real) volta tudo ao lugar. Depois do início da Copa, aponte o `.env.local` para um Supabase de teste.
+- **Pause o `pg_cron` antes do L1.** Há um job `sync-matches-hourly` dentro do Supabase de prod que chama o deploy de hora em hora com o openfootball **real** — ele desfaria seus placares simulados. Pause e reative com o helper:
+  ```bash
+  npm i pg --no-save                                              # pré-req (throwaway)
+  node --env-file=.env.local scripts/cron-sync-toggle.mjs pause   # antes do L1
+  # ... rodar o loop ...
+  node --env-file=.env.local scripts/cron-sync-toggle.mjs resume  # no fim (OBRIGATÓRIO)
+  ```
+- **Aposta de campeão** trava em `BET_DEADLINE` = `OPENING_MATCH_KICKOFF` = `2026-06-11T19:00Z` (`lib/copa-teams.ts`). Faça no L0, antes desse prazo.
+
+### 3.4 Setup (uma vez)
+
+```bash
+# 1. apontar a ingestão pro mock — adicione ao .env.local:
+echo 'OPENFOOTBALL_URL=http://localhost:5555/worldcup.mock.json' >> .env.local
+
+# 2. servir o mock (terminal dedicado, deixa rodando)
+node scripts/serve-mock.mjs
+
+# 3. subir o dev DEPOIS de setar a env (a URL é lida no load do módulo)
+npm run dev
+
+# 4. pausar o cron (ver 3.3)
+node --env-file=.env.local scripts/cron-sync-toggle.mjs pause
+```
+
+> Caminho **híbrido** (o que usamos): como o site publicado lê o **mesmo banco**, dá pra palpitar direto em produção (`bolao-copa-pied.vercel.app`) enquanto o mock+sync rodam local. Não precisa logar no localhost.
+
+### 3.5 O loop, por nível
+
+Para cada nível N de 0 a 6:
+
+```bash
+# gera o snapshot do nível N
+node scripts/gen-mock.mjs <N>
+
+# dispara o sync local (grava no banco do .env.local)
+curl -X POST http://localhost:3000/api/admin/sync-matches \
+  -H "Authorization: Bearer $(grep '^SUPABASE_SERVICE_ROLE_KEY=' .env.local | cut -d= -f2-)"
+```
+
+Depois do sync, **palpite na UI** a fase que abriu (ver tabela 3.2) e avance para N+1. Não precisa reiniciar o dev nem o serve-mock entre níveis — só regenerar + re-sincronizar.
+
+**Verificações esperadas a cada nível** (opcionais, via PostgREST com a service key): grupos viram `finished`; a fase N aparece com **times reais** (ex.: `wc2026-73` deixa de ser `2A` vs `2B`); a fase N+1 segue em placeholder. No L6: **104/104 finished**, final com placar, campeão/vice derivados pelo `lib/ranking.ts`.
+
+### 3.6 Reverter ao openfootball real (no fim)
+
+```bash
+# 1. remover a linha OPENFOOTBALL_URL do .env.local (editar e apagar)
+# 2. reiniciar o dev (recarrega a URL real no módulo)
+# 3. sync real -> regrava os 104 jogos como scheduled/sem placar
+curl -X POST http://localhost:3000/api/admin/sync-matches \
+  -H "Authorization: Bearer $(grep '^SUPABASE_SERVICE_ROLE_KEY=' .env.local | cut -d= -f2-)"
+# 4. REATIVAR o cron
+node --env-file=.env.local scripts/cron-sync-toggle.mjs resume
+# 5. parar o serve-mock; o worldcup.mock.json é gitignored (pode apagar)
+# 6. (opcional) npm uninstall pg --no-save
+```
+
+**Baseline para conferir o revert:** `matches` = **104** (todos `wc2026-*`), **0 finished**, todos `scheduled`. Se você criou palpites/champion_bets de teste e quer base zerada pro lançamento, apague `predictions` e `champion_bets` (as ligas podem ficar).
+
+### 3.7 Apêndice — limpeza de duplicatas (feita 2026-06-05)
+
+Na primeira rodada o banco tinha **176 jogos**: 104 do esquema openfootball (`wc2026-*`) **+ 72 legados** (`copa26_*`, seed antigo de grupos — migrations `...019`/`...020`) que concentravam 100% dos palpites. Padronizamos em openfootball: os palpites foram **migrados** `copa26_*`→`wc2026-*` (casamento por grupo + par de times, bijeção 72/72, mesma orientação home/away → sem inverter placar) e os 72 legados foram removidos. Se o banco voltar a ter linhas fora do padrão `wc2026-*`, é esse o cenário — migrar os palpites para o jogo equivalente antes de deletar o legado.
