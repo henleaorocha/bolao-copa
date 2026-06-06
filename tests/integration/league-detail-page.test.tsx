@@ -130,7 +130,8 @@ const mockLeague: LeagueDetail = {
   has_champion_bet: false,
   champion_bet: null,
   prizes: null,
-  user_stats: { position: 0, points: 0, guesses_made: 0, guesses_total: 0, exact_scores: 0 },
+  user_stats: { position: 0, points: 0, exact_scores: 0 },
+  matches_played: 0,
   ranking: [],
   members: [
     {

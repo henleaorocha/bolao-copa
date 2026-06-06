@@ -228,6 +228,54 @@ describe('Palpites page — integration', () => {
     expect(screen.getByTestId('input-home-closed-m')).toBeDisabled()
   })
 
+  it('a finished match shows the real score next to the prediction without breaking open/closed rows', async () => {
+    const matches = [
+      makeMatch({ id: 'open-m', is_deadline_passed: false, prediction: null }),
+      makeMatch({ id: 'closed-m', is_deadline_passed: true, status: 'scheduled' }),
+      makeMatch({
+        id: 'done-m',
+        status: 'finished',
+        is_deadline_passed: true,
+        home_score: 2,
+        away_score: 0,
+        prediction: { predicted_home_score: 1, predicted_away_score: 0 },
+      }),
+    ]
+    setupFetchMock(matches)
+
+    render(<PalpitesPage />)
+    await waitFor(() => expect(screen.getAllByTestId('match-row')).toHaveLength(3))
+
+    // The five-state vocabulary is reflected: ABERTO, FECHADO, ENCERRADO all present
+    expect(screen.getByTestId('badge-aberto')).toBeInTheDocument()
+    expect(screen.getByTestId('badge-fechado')).toBeInTheDocument()
+    expect(screen.getByTestId('badge-finished')).toHaveTextContent('ENCERRADO')
+
+    // Finished row renders the real result alongside the locked prediction
+    expect(screen.getByTestId('final-score')).toHaveTextContent('2 × 0')
+    expect(screen.getByTestId('finished-prediction')).toHaveTextContent('Palpite: 1 × 0')
+
+    // Open row keeps its working, enabled inputs; the finished row has none
+    expect(screen.getByTestId('input-home-open-m')).not.toBeDisabled()
+    expect(screen.queryByTestId('input-home-done-m')).not.toBeInTheDocument()
+
+    // Save flow still works for the open row only
+    fireEvent.change(screen.getByTestId('input-home-open-m'), { target: { value: '3' } })
+    fireEvent.change(screen.getByTestId('input-away-open-m'), { target: { value: '2' } })
+    expect(screen.getByTestId('save-all-btn')).not.toBeDisabled()
+
+    fireEvent.click(screen.getByTestId('save-all-btn'))
+    await waitFor(() => {
+      const calls = vi.mocked(global.fetch).mock.calls.map(([url]) => String(url))
+      expect(calls.some((u) => u.includes('/predictions/open-m'))).toBe(true)
+    })
+    // Finished/closed rows are never PUT
+    const putCalls = vi
+      .mocked(global.fetch)
+      .mock.calls.filter(([url]) => String(url).includes('/predictions/'))
+    expect(putCalls).toHaveLength(1)
+  })
+
   it('combining date and group filters shows the intersection of matches', async () => {
     const today = new Date()
     const matches = [

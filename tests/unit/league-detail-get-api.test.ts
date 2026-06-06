@@ -369,8 +369,7 @@ describe('GET /api/leagues/[id] — scoring: group stage', () => {
     const json = await res.json()
     expect(json.data.user_stats.points).toBe(0)
     expect(json.data.user_stats.position).toBe(1)
-    expect(json.data.user_stats.guesses_made).toBe(0)
-    expect(json.data.user_stats.guesses_total).toBe(72)
+    expect(json.data.matches_played).toBe(0)
     expect(json.data.user_stats.exact_scores).toBe(0)
   })
 
@@ -391,7 +390,7 @@ describe('GET /api/leagues/[id] — scoring: group stage', () => {
     const json = await res.json()
     expect(json.data.user_stats.points).toBe(10)
     expect(json.data.user_stats.exact_scores).toBe(1)
-    expect(json.data.user_stats.guesses_made).toBe(1)
+    expect(json.data.matches_played).toBe(1)
   })
 
   it('correct outcome (non-exact) group hit → +5 points', async () => {
@@ -444,10 +443,10 @@ describe('GET /api/leagues/[id] — scoring: group stage', () => {
     const res = await GET(makeRequest(), makeParams())
     const json = await res.json()
     expect(json.data.user_stats.points).toBe(0)
-    expect(json.data.user_stats.guesses_made).toBe(0)
+    expect(json.data.matches_played).toBe(0)
   })
 
-  it('guesses_total is the fixed group-stage match count (72), independent of finished matches', async () => {
+  it('matches_played counts every finished match with both scores (tournament-wide)', async () => {
     vi.mocked(getSupabaseServerClient).mockResolvedValue(
       makeSupabase({
         finishedMatchesResult: {
@@ -462,7 +461,35 @@ describe('GET /api/leagues/[id] — scoring: group stage', () => {
     )
     const res = await GET(makeRequest(), makeParams())
     const json = await res.json()
-    expect(json.data.user_stats.guesses_total).toBe(72)
+    expect(json.data.matches_played).toBe(3)
+  })
+
+  it('matches_played excludes finished rows missing a home or away score', async () => {
+    vi.mocked(getSupabaseServerClient).mockResolvedValue(
+      makeSupabase({
+        finishedMatchesResult: {
+          data: [
+            makeFinishedMatch({ id: 'm1', home_score: 2, away_score: 1 }),
+            makeFinishedMatch({ id: 'm2', home_score: null, away_score: 1 }),
+            makeFinishedMatch({ id: 'm3', home_score: 0, away_score: null }),
+            makeFinishedMatch({ id: 'm4', home_score: null, away_score: null }),
+          ],
+          error: null,
+        },
+      }) as never
+    )
+    const res = await GET(makeRequest(), makeParams())
+    const json = await res.json()
+    // Only m1 carries both scores.
+    expect(json.data.matches_played).toBe(1)
+  })
+
+  it('does not expose per-user guesses_made / guesses_total fields', async () => {
+    vi.mocked(getSupabaseServerClient).mockResolvedValue(makeSupabase() as never)
+    const res = await GET(makeRequest(), makeParams())
+    const json = await res.json()
+    expect(json.data.user_stats).not.toHaveProperty('guesses_made')
+    expect(json.data.user_stats).not.toHaveProperty('guesses_total')
   })
 })
 
@@ -909,8 +936,8 @@ describe('GET /api/leagues/[id] — combined scoring scenarios', () => {
     // 10 (group) + 25 (8th) + 75 (champion+vice) = 110
     expect(json.data.user_stats.points).toBe(110)
     expect(json.data.user_stats.exact_scores).toBe(2)
-    expect(json.data.user_stats.guesses_made).toBe(2)
-    expect(json.data.user_stats.guesses_total).toBe(72)
+    // 3 finished matches (group, 8th, final), all with both scores.
+    expect(json.data.matches_played).toBe(3)
   })
 
   it('away team wins final → correct champion/vice derived from away_score > home_score', async () => {
@@ -955,7 +982,7 @@ describe('GET /api/leagues/[id] — combined scoring scenarios', () => {
     expect(res.status).toBe(200)
     const json = await res.json()
     expect(json.data.user_stats.points).toBe(0)
-    expect(json.data.user_stats.guesses_total).toBe(72)
+    expect(json.data.matches_played).toBe(0)
   })
 
   it('predictions query error → graceful fallback to 0 points (still 200)', async () => {
@@ -972,7 +999,7 @@ describe('GET /api/leagues/[id] — combined scoring scenarios', () => {
     expect(res.status).toBe(200)
     const json = await res.json()
     expect(json.data.user_stats.points).toBe(0)
-    expect(json.data.user_stats.guesses_total).toBe(72)
+    expect(json.data.matches_played).toBe(1)
   })
 
   it('prediction for a dead-enum 4th phase match → 0 points', async () => {
@@ -991,6 +1018,6 @@ describe('GET /api/leagues/[id] — combined scoring scenarios', () => {
     const res = await GET(makeRequest(), makeParams())
     const json = await res.json()
     expect(json.data.user_stats.points).toBe(0)
-    expect(json.data.user_stats.guesses_made).toBe(1)
+    expect(json.data.matches_played).toBe(1)
   })
 })

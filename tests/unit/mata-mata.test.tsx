@@ -75,13 +75,15 @@ function makePhase(
 }
 
 function makeBracketResponse(
-  slotsByPhase: Partial<Record<KnockoutPhase, BracketSlotView[]>> = {}
+  slotsByPhase: Partial<Record<KnockoutPhase, BracketSlotView[]>> = {},
+  activePhase: KnockoutPhase = '32nd'
 ): BracketResponse {
   return {
     phases: PHASE_ORDER.map((phase) =>
       makePhase(phase, slotsByPhase[phase] ?? [makeSlot({ pos: 1, multiplier: PHASE_MULTIPLIERS[phase] })])
     ),
     newlyUnlockedPhase: null,
+    activePhase,
   }
 }
 
@@ -261,6 +263,103 @@ describe('MatchCard — open state', () => {
     )
     fireEvent.change(screen.getByTestId('input-away-match-1'), { target: { value: '0' } })
     expect(onInputChange).toHaveBeenCalledWith('match-1', 'away', '0')
+  })
+})
+
+describe('MatchCard — PALPITADO state (open + saved prediction)', () => {
+  afterEach(() => vi.restoreAllMocks())
+
+  it('shows the ✓ PALPITADO badge when an open slot already has a prediction', async () => {
+    const MatchCard = await importMatchCard()
+    render(
+      <MatchCard
+        slot={makeSlot({
+          state: 'open',
+          matchId: 'match-1',
+          homeTeam: 'Brasil',
+          awayTeam: 'Argentina',
+          prediction: { home: 2, away: 1 },
+        })}
+        homeInput="2"
+        awayInput="1"
+        onInputChange={vi.fn()}
+      />
+    )
+    const badge = screen.getByTestId('badge-predicted')
+    expect(badge).toBeInTheDocument()
+    expect(badge).toHaveTextContent('✓ PALPITADO')
+    // open badge must NOT be present
+    expect(screen.queryByTestId('badge-open')).not.toBeInTheDocument()
+  })
+
+  it('keeps inputs editable and pre-filled for an open slot with a prediction', async () => {
+    const MatchCard = await importMatchCard()
+    const onInputChange = vi.fn()
+    render(
+      <MatchCard
+        slot={makeSlot({
+          state: 'open',
+          matchId: 'match-1',
+          homeTeam: 'Brasil',
+          awayTeam: 'Argentina',
+          prediction: { home: 2, away: 1 },
+        })}
+        homeInput="2"
+        awayInput="1"
+        onInputChange={onInputChange}
+      />
+    )
+    const homeInput = screen.getByTestId('input-home-match-1') as HTMLInputElement
+    const awayInput = screen.getByTestId('input-away-match-1') as HTMLInputElement
+    expect(homeInput.value).toBe('2')
+    expect(awayInput.value).toBe('1')
+    expect(homeInput).not.toBeDisabled()
+    fireEvent.change(homeInput, { target: { value: '3' } })
+    expect(onInputChange).toHaveBeenCalledWith('match-1', 'home', '3')
+    // PALPITADO slot stays editable — no read-only locked block
+    expect(screen.queryByTestId('locked-prediction')).not.toBeInTheDocument()
+  })
+
+  it('shows ABERTO (not PALPITADO) when an open slot has no prediction', async () => {
+    const MatchCard = await importMatchCard()
+    render(
+      <MatchCard
+        slot={makeSlot({
+          state: 'open',
+          matchId: 'match-1',
+          homeTeam: 'Brasil',
+          awayTeam: 'Argentina',
+          prediction: null,
+        })}
+        homeInput=""
+        awayInput=""
+        onInputChange={vi.fn()}
+      />
+    )
+    expect(screen.getByTestId('badge-open')).toBeInTheDocument()
+    expect(screen.queryByTestId('badge-predicted')).not.toBeInTheDocument()
+  })
+})
+
+describe('MatchCard — placeholder team rows', () => {
+  afterEach(() => vi.restoreAllMocks())
+
+  it('renders placeholder labels with italic styling', async () => {
+    const MatchCard = await importMatchCard()
+    render(
+      <MatchCard
+        slot={makeSlot({
+          state: 'placeholder',
+          homeLabel: 'Vencedor 1º Grupo A',
+          awayLabel: 'Vencedor 2º Grupo B',
+        })}
+        homeInput=""
+        awayInput=""
+        onInputChange={vi.fn()}
+      />
+    )
+    expect(screen.getByTestId('home-display')).toHaveClass('italic')
+    expect(screen.getByTestId('away-display')).toHaveClass('italic')
   })
 })
 
@@ -547,6 +646,56 @@ describe('MataMataPage — phase selector', () => {
   })
 })
 
+describe('MataMataPage — seeds initial phase from activePhase', () => {
+  beforeEach(() => {
+    vi.mocked(useParams as ReturnType<typeof vi.fn>).mockReturnValue({ id: LEAGUE_ID })
+  })
+  afterEach(() => vi.restoreAllMocks())
+
+  it('lands on the server-provided activePhase on first load (mid-knockout)', async () => {
+    // Knockout is mid-tournament: active phase is the quarter-finals ('8th').
+    mockBracketFetch(makeBracketResponse({}, '8th'))
+    const MataMataPage = await importMataMataPage()
+    render(<MataMataPage />)
+
+    await waitFor(() => expect(screen.getByTestId('phase-chip-8th')).toBeInTheDocument())
+    expect(screen.getByTestId('phase-chip-8th')).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByTestId('phase-chip-32nd')).toHaveAttribute('aria-selected', 'false')
+  })
+
+  it('does not override the user tab selection on a subsequent re-render', async () => {
+    // activePhase is '8th', but the '32nd' phase carries an open slot with an input
+    // so we can trigger a real re-render (setInputValues) after the user navigates.
+    const openSlot = makeSlot({
+      pos: 1,
+      state: 'open',
+      matchId: 'match-open-1',
+      homeTeam: 'Brasil',
+      awayTeam: 'México',
+      multiplier: 1.5,
+      prediction: null,
+    })
+    mockBracketFetch(makeBracketResponse({ '32nd': [openSlot] }, '8th'))
+    const MataMataPage = await importMataMataPage()
+    render(<MataMataPage />)
+
+    // First load seeds the active phase ('8th')
+    await waitFor(() => expect(screen.getByTestId('phase-chip-8th')).toBeInTheDocument())
+    expect(screen.getByTestId('phase-chip-8th')).toHaveAttribute('aria-selected', 'true')
+
+    // User navigates back to the 32nd tab
+    fireEvent.click(screen.getByTestId('phase-chip-32nd'))
+    expect(screen.getByTestId('phase-chip-32nd')).toHaveAttribute('aria-selected', 'true')
+
+    // Typing in the open slot triggers a state-driven re-render; the seed guard must
+    // NOT snap the phase back to the server's activePhase ('8th').
+    fireEvent.change(screen.getByTestId('input-home-match-open-1'), { target: { value: '3' } })
+
+    expect(screen.getByTestId('phase-chip-32nd')).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByTestId('phase-chip-8th')).toHaveAttribute('aria-selected', 'false')
+  })
+})
+
 describe('MataMataPage — prediction submission', () => {
   beforeEach(() => {
     vi.mocked(useParams as ReturnType<typeof vi.fn>).mockReturnValue({ id: LEAGUE_ID })
@@ -629,6 +778,42 @@ describe('MataMataPage — prediction submission', () => {
 
     await waitFor(() => expect(screen.getByTestId('save-all-btn')).toBeInTheDocument())
     expect(screen.getByTestId('save-all-btn')).toBeDisabled()
+  })
+})
+
+describe('MataMataPage — PALPITADO + multiplier badge', () => {
+  beforeEach(() => {
+    vi.mocked(useParams as ReturnType<typeof vi.fn>).mockReturnValue({ id: LEAGUE_ID })
+  })
+  afterEach(() => vi.restoreAllMocks())
+
+  it('surfaces ✓ PALPITADO and the phase multiplier for a seeded open-with-prediction slot', async () => {
+    const predictedSlot = makeSlot({
+      pos: 1,
+      state: 'open',
+      matchId: 'match-pred-1',
+      homeTeam: 'Brasil',
+      awayTeam: 'Croácia',
+      homeFlag: 'br',
+      awayFlag: 'hr',
+      kickoff: '2026-06-28T21:00:00Z',
+      multiplier: 1.5,
+      prediction: { home: 2, away: 1 },
+    })
+    mockBracketFetch(makeBracketResponse({ '32nd': [predictedSlot] }))
+    const MataMataPage = await importMataMataPage()
+    render(<MataMataPage />)
+
+    await waitFor(() => expect(screen.getByTestId('badge-predicted')).toBeInTheDocument())
+    expect(screen.getByTestId('badge-predicted')).toHaveTextContent('✓ PALPITADO')
+    // Multiplier badge for the phase still renders on the card
+    const card = screen.getByTestId('match-card')
+    expect(card).toHaveTextContent('1.5×')
+    // Phase tabs still render
+    expect(screen.getByTestId('phase-chip-32nd')).toBeInTheDocument()
+    // Inputs are pre-filled with the saved prediction
+    expect((screen.getByTestId('input-home-match-pred-1') as HTMLInputElement).value).toBe('2')
+    expect((screen.getByTestId('input-away-match-pred-1') as HTMLInputElement).value).toBe('1')
   })
 })
 

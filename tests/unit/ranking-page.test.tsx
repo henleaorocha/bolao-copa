@@ -65,10 +65,9 @@ function makeLeague(overrides: Partial<LeagueDetail> = {}): LeagueDetail {
     user_stats: {
       position: 1,
       points: 100,
-      guesses_made: 5,
-      guesses_total: 10,
       exact_scores: 2,
     },
+    matches_played: 0,
     ranking: [],
     ...overrides,
   }

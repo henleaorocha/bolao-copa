@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useParams } from 'next/navigation'
 import { Save } from 'lucide-react'
 import type { BracketResponse } from '@/lib/bracket'
@@ -40,6 +40,10 @@ export default function MataMataPage() {
   const [selectedPhase, setSelectedPhase] = useState<KnockoutPhase>('32nd')
   const [inputValues, setInputValues] = useState<InputValues>({})
   const [saving, setSaving] = useState(false)
+  // Seed selectedPhase from the server's activePhase exactly once on first load.
+  // A ref (not state) so the guard survives re-renders and never overrides the
+  // user's own tab navigation on subsequent renders (ADR-004).
+  const phaseSeededRef = useRef(false)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -53,6 +57,11 @@ export default function MataMataPage() {
         const data: BracketResponse = body.data
         setBracket(data)
         setMataMataUnlock(data.newlyUnlockedPhase)
+
+        if (!phaseSeededRef.current) {
+          setSelectedPhase(data.activePhase)
+          phaseSeededRef.current = true
+        }
 
         const initial: InputValues = {}
         for (const phase of data.phases) {

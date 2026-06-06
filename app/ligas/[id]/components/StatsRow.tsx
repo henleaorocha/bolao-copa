@@ -1,13 +1,15 @@
 'use client'
 
 import type { UserStats } from '@/lib/api/types'
+import { TOTAL_MATCH_COUNT } from '@/lib/copa-teams'
 
 interface StatsRowProps {
   user_stats: UserStats
   member_count: number
+  matches_played: number
 }
 
-export default function StatsRow({ user_stats, member_count }: StatsRowProps) {
+export default function StatsRow({ user_stats, member_count, matches_played }: StatsRowProps) {
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
       {/* Sua Posição */}
@@ -40,15 +42,15 @@ export default function StatsRow({ user_stats, member_count }: StatsRowProps) {
         </svg>
       </div>
 
-      {/* Palpites */}
+      {/* Jogos já realizados — tournament-wide, identical for every member */}
       <div className="rounded-xl bg-white border border-slate-100 shadow-sm p-4">
         <span className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">
-          Palpites
+          JOGOS JÁ REALIZADOS
         </span>
         <span className="block text-3xl font-black text-slate-900 leading-none">
-          {user_stats.guesses_made}/{user_stats.guesses_total}
+          {matches_played}/{TOTAL_MATCH_COUNT}
         </span>
-        <span className="block text-xs text-slate-400 mt-1">fase de grupos</span>
+        <span className="block text-xs text-slate-400 mt-1">fase de grupos + mata-mata</span>
       </div>
 
       {/* Acertos Exatos */}

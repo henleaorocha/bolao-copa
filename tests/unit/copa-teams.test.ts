@@ -4,6 +4,8 @@ import {
   ALL_COPA_TEAMS,
   VALID_TEAM_NAMES,
   BET_DEADLINE,
+  GROUP_STAGE_MATCH_COUNT,
+  TOTAL_MATCH_COUNT,
 } from '@/lib/copa-teams'
 
 // The six real 2026 qualifiers added when reconciling to seed 020 (ADR-003).
@@ -28,6 +30,17 @@ const REMOVED_NON_QUALIFIERS = [
   'Jamaica',
   'Bolívia',
 ]
+
+describe('copa-teams match-count constants', () => {
+  it('TOTAL_MATCH_COUNT is 104 (the tournament-wide denominator)', () => {
+    expect(TOTAL_MATCH_COUNT).toBe(104)
+  })
+
+  it('TOTAL_MATCH_COUNT equals 72 group + 32 knockout matches', () => {
+    expect(TOTAL_MATCH_COUNT).toBe(GROUP_STAGE_MATCH_COUNT + 32)
+    expect(GROUP_STAGE_MATCH_COUNT).toBe(72)
+  })
+})
 
 describe('copa-teams static data', () => {
   it('ALL_COPA_TEAMS contains exactly 48 teams (the real 2026 draw)', () => {

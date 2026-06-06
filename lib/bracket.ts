@@ -36,6 +36,10 @@ export interface BracketPhaseView {
 export interface BracketResponse {
   phases: BracketPhaseView[]
   newlyUnlockedPhase: KnockoutPhase | null
+  // Earliest phase in PHASE_ORDER still in play (any slot not 'finished'); falls
+  // back to the last phase ('final') when the whole knockout is finished. Always
+  // non-null. Seeds the Mata-mata page's initial selected phase (ADR-004).
+  activePhase: KnockoutPhase
 }
 
 export const PHASE_MULTIPLIERS: Record<KnockoutPhase, number> = {
@@ -175,5 +179,12 @@ export function buildBracketResponse(
     return { phase, label, multiplier, slots }
   })
 
-  return { phases, newlyUnlockedPhase }
+  // activePhase = first phase in PHASE_ORDER (phases is built in that order) with any
+  // non-finished slot; if every phase is fully finished, fall back to 'final'. Never
+  // null. Independent of newlyUnlockedPhase, which tracks the latest open un-bet phase.
+  const activePhase: KnockoutPhase =
+    phases.find((p) => p.slots.some((s) => s.state !== 'finished'))?.phase ??
+    PHASE_ORDER[PHASE_ORDER.length - 1]
+
+  return { phases, newlyUnlockedPhase, activePhase }
 }

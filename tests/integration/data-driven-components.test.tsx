@@ -20,8 +20,6 @@ import type { UserStats, RankingEntry } from '@/lib/api/types'
 const zeroStats: UserStats = {
   position: 0,
   points: 0,
-  guesses_made: 0,
-  guesses_total: 0,
   exact_scores: 0,
 }
 
@@ -37,15 +35,17 @@ function PanelComposition({
   ranking,
   currentUserId,
   leagueId = 'test-league',
+  matches_played = 0,
 }: {
   prizes: string | null
   ranking: RankingEntry[]
   currentUserId: string
   leagueId?: string
+  matches_played?: number
 }) {
   return (
     <div>
-      <StatsRow user_stats={zeroStats} member_count={10} />
+      <StatsRow user_stats={zeroStats} member_count={10} matches_played={matches_played} />
       <PrizesStrip prizes={prizes} />
       <RankingCard ranking={ranking} currentUserId={currentUserId} leagueId={leagueId} />
     </div>
@@ -53,6 +53,22 @@ function PanelComposition({
 }
 
 describe('Data-driven components — integration', () => {
+  it('Panel renders the tournament-wide "JOGOS JÁ REALIZADOS" card (N / 104)', () => {
+    render(
+      <PanelComposition
+        prizes={null}
+        ranking={[makeEntry({ user_id: 'u1', position: 1 })]}
+        currentUserId="u1"
+        matches_played={23}
+      />,
+    )
+    expect(screen.getByText('JOGOS JÁ REALIZADOS')).toBeInTheDocument()
+    expect(screen.getByText('23/104')).toBeInTheDocument()
+    expect(screen.getByText('fase de grupos + mata-mata')).toBeInTheDocument()
+    // The personal "Palpites · fase de grupos" card is gone.
+    expect(screen.queryByText('Palpites')).not.toBeInTheDocument()
+  })
+
   it('PrizesStrip is absent from DOM when prizes is null', () => {
     render(
       <PanelComposition

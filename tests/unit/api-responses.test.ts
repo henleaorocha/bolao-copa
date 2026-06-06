@@ -94,7 +94,8 @@ describe('LeagueDetail type shape', () => {
     has_champion_bet: false,
     champion_bet: null,
     prizes: null,
-    user_stats: { position: 0, points: 0, guesses_made: 0, guesses_total: 0, exact_scores: 0 },
+    user_stats: { position: 0, points: 0, exact_scores: 0 },
+    matches_played: 0,
     ranking: [],
   } satisfies LeagueDetail
 
@@ -161,14 +162,10 @@ describe('UserStats type shape', () => {
     const stats = {
       position: 0,
       points: 0,
-      guesses_made: 0,
-      guesses_total: 0,
       exact_scores: 0,
     } satisfies UserStats
     expect(stats.position).toBe(0)
     expect(stats.points).toBe(0)
-    expect(stats.guesses_made).toBe(0)
-    expect(stats.guesses_total).toBe(0)
     expect(stats.exact_scores).toBe(0)
   })
 
@@ -176,8 +173,6 @@ describe('UserStats type shape', () => {
     const stats = {
       position: 3,
       points: 42,
-      guesses_made: 10,
-      guesses_total: 20,
       exact_scores: 2,
     } satisfies UserStats
     expect(stats.position).toBe(3)
@@ -242,7 +237,8 @@ describe('LeagueDetail extended type shape', () => {
       has_champion_bet: false,
       champion_bet: null,
       prizes: null,
-      user_stats: { position: 0, points: 0, guesses_made: 0, guesses_total: 0, exact_scores: 0 },
+      user_stats: { position: 0, points: 0, exact_scores: 0 },
+      matches_played: 0,
       ranking: [],
     } satisfies LeagueDetail
     expect(detail.prizes).toBeNull()
@@ -265,7 +261,8 @@ describe('LeagueDetail extended type shape', () => {
       has_champion_bet: true,
       champion_bet: null,
       prizes: 'R$100 para o 1º lugar',
-      user_stats: { position: 1, points: 50, guesses_made: 5, guesses_total: 10, exact_scores: 1 },
+      user_stats: { position: 1, points: 50, exact_scores: 1 },
+      matches_played: 12,
       ranking: [
         { user_id: 'user-1', full_name: 'João', avatar_color: '#FF0000', points: 50, position: 1 },
       ],

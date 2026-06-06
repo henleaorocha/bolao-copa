@@ -200,6 +200,90 @@ describe('buildBracketResponse — newlyUnlockedPhase logic', () => {
   })
 })
 
+describe('buildBracketResponse — activePhase', () => {
+  // Build a finished knockout match for a given skeleton slot (by external_id),
+  // with valid Copa teams so the slot resolves to 'finished'.
+  function finishedMatchForExternalId(externalId: string, idx: number): Match {
+    return makeMatch({
+      id: `m-${idx}`,
+      external_id: externalId,
+      status: 'finished',
+      home_score: 1,
+      away_score: 0,
+    })
+  }
+
+  function finishedMatchesForPhases(phases: string[]): Match[] {
+    return BRACKET_SKELETON.filter((s) => phases.includes(s.phase)).map((s, i) =>
+      finishedMatchForExternalId(s.externalId, i)
+    )
+  }
+
+  it('is always non-null and is "32nd" pre-tournament (all placeholder)', () => {
+    const result = buildBracketResponse([], [])
+    expect(result.activePhase).toBe('32nd')
+  })
+
+  it('is "32nd" while the round of 32 has any non-finished slot (partial finish)', () => {
+    // Only R32 slot #1 is finished; the rest of R32 stays placeholder (non-finished).
+    const result = buildBracketResponse(
+      [finishedMatchForExternalId('wc2026-73', 0)],
+      [],
+      NOW_OPEN
+    )
+    expect(result.activePhase).toBe('32nd')
+  })
+
+  it('is "16th" when the entire round of 32 is finished and the rest is open/placeholder', () => {
+    const matches = finishedMatchesForPhases(['32nd'])
+    const result = buildBracketResponse(matches, [], NOW_OPEN)
+    expect(result.activePhase).toBe('16th')
+  })
+
+  it('is the earliest non-finished phase across mixed phases', () => {
+    // R32 and R16 fully finished; quarter-finals onward are still placeholder.
+    const matches = finishedMatchesForPhases(['32nd', '16th'])
+    const result = buildBracketResponse(matches, [], NOW_OPEN)
+    expect(result.activePhase).toBe('8th')
+  })
+
+  it('falls back to "final" when the entire knockout is finished', () => {
+    const matches = finishedMatchesForPhases([
+      '32nd',
+      '16th',
+      '8th',
+      'semi',
+      '3rd_place',
+      'final',
+    ])
+    const result = buildBracketResponse(matches, [], NOW_OPEN)
+    expect(result.activePhase).toBe('final')
+  })
+
+  it('does not change newlyUnlockedPhase (regression guard, differs from activePhase)', () => {
+    // R32 slot #1 open WITH a prediction, semi slot #2 open WITHOUT one. This yields
+    // activePhase '32nd' (earliest non-finished) but newlyUnlockedPhase 'semi'
+    // (latest open un-bet) — proving the two fields are computed independently.
+    const SEMI_SLOT2_DATE = '2026-07-17T21:00:00Z'
+    const nowMs = new Date('2026-06-01T00:00:00Z').getTime()
+
+    const r32Match = makeMatch({ id: 'match-r32' })
+    const semiMatch = makeMatch({
+      id: 'match-semi',
+      external_id: 'wc2026-102',
+      match_date: SEMI_SLOT2_DATE,
+      phase: 'semi',
+    })
+    const predictions = [
+      { match_id: 'match-r32', predicted_home_score: 1, predicted_away_score: 0 },
+    ]
+
+    const result = buildBracketResponse([r32Match, semiMatch], predictions, nowMs)
+    expect(result.newlyUnlockedPhase).toBe('semi')
+    expect(result.activePhase).toBe('32nd')
+  })
+})
+
 describe('buildBracketResponse — phase structure correctness', () => {
   it('returns phases in PHASE_ORDER with correct multipliers', () => {
     const result = buildBracketResponse([], [])

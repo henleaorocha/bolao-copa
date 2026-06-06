@@ -3,7 +3,6 @@ import { getSupabaseServerClient } from '@/lib/supabase/client'
 import { formatSuccess, formatError } from '@/lib/api/responses'
 import type { LeagueDetail, LeagueMember, RankingEntry, UserStats } from '@/lib/api/types'
 import { computeRanking } from '@/lib/ranking'
-import { GROUP_STAGE_MATCH_COUNT } from '@/lib/copa-teams'
 
 interface UserEmbed {
   full_name: string | null
@@ -19,16 +18,6 @@ interface LeagueMemberRecord {
   // PostgREST returns the to-one users join as an object; older generated
   // types model it as an array — accept both so full_name always resolves.
   users: UserEmbed | UserEmbed[] | null
-}
-
-interface FinishedMatchRow {
-  id: string
-  phase: string
-  home_team: string
-  away_team: string
-  home_score: number | null
-  away_score: number | null
-  match_date: string
 }
 
 interface ChampionBetRow {
@@ -180,10 +169,6 @@ export async function GET(
     }
 
     // Build lookups
-    const finishedMatchMap = new Map<string, FinishedMatchRow>(
-      (finishedMatches ?? []).map((m) => [m.id, m])
-    )
-
     const champBetByUser = new Map<string, ChampionBetRow>(
       (allChampBets ?? []).map((b) => [b.user_id, b])
     )
@@ -214,21 +199,19 @@ export async function GET(
       position: entry.position,
     }))
 
-    // Derive user_stats: position/points/exact_scores from helper; guesses from raw data
+    // Derive user_stats: position/points/exact_scores from helper
     const currentUserEntry = rankingResult.find((e) => e.user_id === user.id)
-    const guesses_made = (allPredictions ?? []).filter((p) => {
-      if (p.user_id !== user.id) return false
-      if (p.predicted_home_score === null || p.predicted_away_score === null) return false
-      const match = finishedMatchMap.get(p.match_id)
-      return match !== undefined && match.home_score !== null && match.away_score !== null
-    }).length
     const user_stats: UserStats = {
       position: currentUserEntry?.position ?? 0,
       points: currentUserEntry?.points ?? 0,
-      guesses_made,
-      guesses_total: GROUP_STAGE_MATCH_COUNT,
       exact_scores: currentUserEntry?.exact_scores ?? 0,
     }
+
+    // Tournament-wide finished-match count (group + knockout), identical for every
+    // member: finished matches that carry both a home and away score.
+    const matches_played = (finishedMatches ?? []).filter(
+      (m) => m.home_score !== null && m.away_score !== null
+    ).length
 
     const currentUserChampBet = champBetByUser.get(user.id) ?? null
     const has_champion_bet = currentUserChampBet !== null
@@ -258,6 +241,7 @@ export async function GET(
       has_champion_bet,
       champion_bet,
       user_stats,
+      matches_played,
       ranking,
     } as LeagueDetail
 

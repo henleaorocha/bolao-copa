@@ -66,8 +66,6 @@ export interface ChampionBet {
 export interface UserStats {
   position: number
   points: number
-  guesses_made: number
-  guesses_total: number
   exact_scores: number
 }
 
@@ -100,6 +98,9 @@ export interface LeagueDetail extends LeagueSummary {
   champion_bet: ChampionBet | null
   prizes: string | null
   user_stats: UserStats
+  // Tournament-wide count of finished matches (group + knockout), out of
+  // TOTAL_MATCH_COUNT (104). Identical for every league member.
+  matches_played: number
   ranking: RankingEntry[]
 }
 

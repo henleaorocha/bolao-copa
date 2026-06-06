@@ -121,7 +121,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
 
             <h2 className="text-white text-lg font-bold mb-1">Entre para jogar 🎯</h2>
             <p className="text-sm mb-6" style={{ color: 'rgba(255,255,255,0.6)' }}>
-              Use sua conta Google da empresa.
+              Use sua conta Google para logar
             </p>
 
             <LoginButton />
@@ -131,7 +131,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
               style={{ borderColor: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.4)' }}
             >
               <Lock size={12} />
-              <span>SSO autenticado · Arkmeds.com</span>
+              <span>SSO autenticado</span>
             </div>
           </div>
 

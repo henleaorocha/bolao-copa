@@ -164,15 +164,18 @@ describe.skipIf(!HAS_SERVICE_KEY)('League detail endpoints (GET, PATCH, DELETE)'
       expect(json.data).toHaveProperty('prizes')
       expect(json.data.prizes === null || typeof json.data.prizes === 'string').toBe(true)
 
-      // user_stats: stub zeros
+      // user_stats: stub zeros (no more per-user guesses fields)
       expect(json.data).toHaveProperty('user_stats')
       expect(json.data.user_stats).toEqual({
         position: 0,
         points: 0,
-        guesses_made: 0,
-        guesses_total: 72,
         exact_scores: 0,
       })
+
+      // matches_played: tournament-wide finished count, an integer >= 0
+      expect(json.data).toHaveProperty('matches_played')
+      expect(Number.isInteger(json.data.matches_played)).toBe(true)
+      expect(json.data.matches_played).toBeGreaterThanOrEqual(0)
 
       // ranking: array, ≤5 entries, each with points: 0 and 1-based position
       expect(json.data).toHaveProperty('ranking')

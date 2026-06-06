@@ -67,7 +67,11 @@ export default function LeagueDetailPage() {
         </div>
 
         <div className="mb-4">
-          <StatsRow user_stats={league.user_stats} member_count={league.member_count} />
+          <StatsRow
+            user_stats={league.user_stats}
+            member_count={league.member_count}
+            matches_played={league.matches_played}
+          />
         </div>
 
         <div className="mb-4 lg:grid lg:grid-cols-3 gap-6 space-y-4 lg:space-y-0">

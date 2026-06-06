@@ -175,6 +175,17 @@ describe('GET /api/leagues/[id]/bracket', () => {
       expect(json.data.phases).toHaveLength(6)
     })
 
+    it('includes a non-null activePhase (defaults to "32nd" pre-Copa)', async () => {
+      vi.mocked(getSupabaseServerClient).mockResolvedValue(
+        makeSupabase({ matchesResult: { data: [], error: null } }) as never
+      )
+      const res = await GET(makeRequest(), makeParams())
+      const json = await res.json()
+
+      expect(json.data).toHaveProperty('activePhase')
+      expect(json.data.activePhase).toBe('32nd')
+    })
+
     it('pre-Copa: all slots are placeholder, newlyUnlockedPhase is null', async () => {
       vi.mocked(getSupabaseServerClient).mockResolvedValue(
         makeSupabase({ matchesResult: { data: [], error: null } }) as never

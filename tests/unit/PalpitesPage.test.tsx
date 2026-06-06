@@ -208,6 +208,60 @@ describe('MatchRow', () => {
     expect(screen.getByTestId('input-home-m1')).not.toBeDisabled()
     expect(screen.getByTestId('input-away-m1')).not.toBeDisabled()
   })
+
+  it('finished match shows "ENCERRADO" badge and the real result with the prediction', () => {
+    render(
+      <MatchRow
+        match={makeMatch({
+          id: 'm1',
+          status: 'finished',
+          is_deadline_passed: true,
+          home_score: 3,
+          away_score: 1,
+          prediction: { predicted_home_score: 2, predicted_away_score: 1 },
+        })}
+        leagueId={LEAGUE_ID}
+        homeInput="2"
+        awayInput="1"
+        onInputChange={vi.fn()}
+      />
+    )
+    // ENCERRADO badge, no open/predicted/closed badge
+    expect(screen.getByTestId('badge-finished')).toHaveTextContent('ENCERRADO')
+    expect(screen.queryByTestId('badge-aberto')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('badge-palpitado')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('badge-fechado')).not.toBeInTheDocument()
+
+    // Real score + the user's locked prediction shown side by side
+    expect(screen.getByTestId('final-score')).toHaveTextContent('3 × 1')
+    expect(screen.getByTestId('finished-prediction')).toHaveTextContent('Palpite: 2 × 1')
+
+    // Editable inputs are replaced by the result, not rendered
+    expect(screen.queryByTestId('input-home-m1')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('input-away-m1')).not.toBeInTheDocument()
+  })
+
+  it('finished match without a prediction shows the result but no "Palpite"', () => {
+    render(
+      <MatchRow
+        match={makeMatch({
+          id: 'm1',
+          status: 'finished',
+          is_deadline_passed: true,
+          home_score: 0,
+          away_score: 0,
+          prediction: null,
+        })}
+        leagueId={LEAGUE_ID}
+        homeInput=""
+        awayInput=""
+        onInputChange={vi.fn()}
+      />
+    )
+    expect(screen.getByTestId('badge-finished')).toHaveTextContent('ENCERRADO')
+    expect(screen.getByTestId('final-score')).toHaveTextContent('0 × 0')
+    expect(screen.queryByTestId('finished-prediction')).not.toBeInTheDocument()
+  })
 })
 
 // ── PalpitesFilters unit tests ────────────────────────────────────────────────

@@ -15,6 +15,17 @@ describe.skipIf(!HAS_DEV_SERVER)('Page rendering', () => {
     expect(html).toContain('Entrar com Google')
   })
 
+  it('/login shows neutral copy and the Google sign-in affordance', async () => {
+    const res = await fetch(`${BASE_URL}/login`)
+    expect(res.status).toBe(200)
+    const html = await res.text()
+    expect(html).toContain('Use sua conta Google para logar')
+    expect(html).toContain('SSO autenticado')
+    expect(html).not.toContain('da empresa')
+    expect(html).not.toContain('Arkmeds.com')
+    expect(html).toContain('Continuar com Google')
+  })
+
   it('/login is accessible without auth (does not redirect)', async () => {
     const res = await fetch(`${BASE_URL}/login`, { redirect: 'manual' })
     expect(res.status).toBe(200)
