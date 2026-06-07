@@ -23,8 +23,10 @@ export default async function DashboardPage() {
   // Resolve the user's active league dynamically
   const activeLeagueId = await resolveActiveLeague(supabase, user.id)
 
+  // No active league is a valid state now that new users are not auto-enrolled
+  // (ADR-005): guide them to /ligas, where the no-league empty state lives.
   if (!activeLeagueId) {
-    throw new Error('Usuário não tem nenhuma liga')
+    redirect('/ligas')
   }
 
   const [userResult, memberResult, leagueResult] = await Promise.all([

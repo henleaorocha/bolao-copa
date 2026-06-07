@@ -12,6 +12,7 @@ import {
   createTestLeague,
   deleteTestLeague,
   addTestLeagueMember,
+  addDefaultLeagueMember,
 } from '../fixtures/factories'
 
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'
@@ -24,6 +25,10 @@ describe.skipIf(!HAS_SERVICE_KEY)('LeagueProvider and app/layout integration', (
   beforeAll(async () => {
     const user = await createTestUser(email)
     userId = user.id
+    // New users are no longer auto-enrolled into the test league (PRD
+    // league-permissions, ADR-002); add the membership explicitly so the
+    // layout/auth-me tests below see the test league as the active league.
+    await addDefaultLeagueMember(userId, 'member')
   })
 
   afterAll(async () => {
@@ -56,27 +61,24 @@ describe.skipIf(!HAS_SERVICE_KEY)('LeagueProvider and app/layout integration', (
     expect([200, 301, 302, 307, 308]).toContain(res.status)
   })
 
-  it('after removing DEFAULT_LEAGUE_ID enrollment, DB trigger still auto-enrolls new users', async () => {
-    // Create a new test user - the DB trigger handle_new_user should auto-enroll them
+  it('DB trigger no longer auto-enrolls new users into the test league (PRD league-permissions, task_02)', async () => {
+    // handle_new_user() keeps the public.users upsert but no longer enrolls new
+    // accounts into the test league (ADR-002); new users start league-less.
     const newEmail = `test-trigger-${Date.now()}@example.com`
     const newUser = await createTestUser(newEmail)
 
     try {
       const admin = adminClient()
-      // Check that the user was auto-enrolled in the default league by the trigger
       const { data, error } = await admin
         .from('league_members')
         .select('role, league_id')
         .eq('user_id', newUser.id)
-        .eq('league_id', DEFAULT_LEAGUE_ID)
-        .single()
 
       expect(error).toBeNull()
-      expect(data).not.toBeNull()
-      expect(data!.role).toBe('member')
-      expect(data!.league_id).toBe(DEFAULT_LEAGUE_ID)
+      expect(data).toHaveLength(0)
     } finally {
       await deleteTestUser(newUser.id)
+      await adminClient().from('users').delete().eq('id', newUser.id)
     }
   })
 

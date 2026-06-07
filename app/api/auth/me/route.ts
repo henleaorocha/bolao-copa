@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
 
     const userResult = await supabase
       .from('users')
-      .select('id, email, full_name, avatar_url, avatar_color, created_at')
+      .select('id, email, full_name, avatar_url, avatar_color, created_at, can_create_league')
       .eq('id', user.id)
       .single()
 
@@ -51,15 +51,36 @@ export async function GET(request: NextRequest) {
 
     const userData = userResult.data
 
+    const userPayload = {
+      id: userData.id,
+      email: userData.email,
+      full_name: userData.full_name,
+      avatar_url: userData.avatar_url,
+      avatar_color: userData.avatar_color,
+      created_at: userData.created_at,
+      can_create_league: userData.can_create_league === true,
+    }
+
     // Resolve the effective league ID using shared utility
     const effectiveLeagueId = await resolveActiveLeague(supabase, user.id)
 
+    // No active league is a valid state (new users are no longer auto-enrolled —
+    // ADR-005): return 200 with league: null so clients can render the no-league
+    // experience instead of an error screen.
     if (!effectiveLeagueId) {
-      console.error('[api/auth/me] Usuário não tem nenhuma liga')
-      return NextResponse.json(
-        formatError('DATABASE_ERROR', 'Erro ao buscar dados do usuário', 500),
-        { status: 500 }
+      const duration = Date.now() - start
+      console.log(
+        JSON.stringify({
+          timestamp: new Date().toISOString(),
+          level: 'info',
+          endpoint: '/api/auth/me',
+          user_id: user.id,
+          status_code: 200,
+          duration_ms: duration,
+          league: null,
+        })
       )
+      return NextResponse.json(formatSuccess({ user: userPayload, league: null }))
     }
 
     // Fetch league and membership details
@@ -100,14 +121,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(
       formatSuccess({
-        user: {
-          id: userData.id,
-          email: userData.email,
-          full_name: userData.full_name,
-          avatar_url: userData.avatar_url,
-          avatar_color: userData.avatar_color,
-          created_at: userData.created_at,
-        },
+        user: userPayload,
         league: {
           ...leagueResult.data,
           role: memberResult.data.role,
@@ -196,7 +210,7 @@ export async function PATCH(request: NextRequest) {
       .from('users')
       .update({ active_league_id })
       .eq('id', user.id)
-      .select('id, email, full_name, avatar_url, avatar_color, created_at')
+      .select('id, email, full_name, avatar_url, avatar_color, created_at, can_create_league')
       .single()
 
     if (updateResult.error) {

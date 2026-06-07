@@ -126,6 +126,19 @@ export async function addTestLeagueMember(
   return data
 }
 
+/**
+ * Convenience wrapper to add a user to the fixed test/default league
+ * (`DEFAULT_LEAGUE_ID`). The `handle_new_user()` trigger no longer auto-enrolls
+ * new accounts into the test league (PRD league-permissions, ADR-002), so suites
+ * that need a user to be a member of it must add the membership explicitly.
+ */
+export async function addDefaultLeagueMember(
+  userId: string,
+  role: 'admin' | 'member' = 'member'
+) {
+  return addTestLeagueMember(DEFAULT_LEAGUE_ID, userId, role)
+}
+
 export function authedClient(accessToken: string) {
   return createClient(
     SUPABASE_URL,

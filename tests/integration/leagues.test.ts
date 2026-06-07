@@ -35,6 +35,15 @@ describe.skipIf(!HAS_SERVICE_KEY)('League endpoints', () => {
     user1Id = user1.id
     user2Id = user2.id
 
+    // user1 is the league creator in the POST /api/leagues cases below. League
+    // creation is now gated on users.can_create_league (PRD league-permissions,
+    // task_04 API guard + RLS); new users are born false, so grant the flag
+    // explicitly by id (random e-mail — no operator-e-mail collision).
+    await adminClient()
+      .from('users')
+      .update({ can_create_league: true })
+      .eq('id', user1Id)
+
     const session1 = await signInTestUser(user1Email)
     const session2 = await signInTestUser(user2Email)
     user1Session = session1.session

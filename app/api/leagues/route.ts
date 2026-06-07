@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseServerClient } from '@/lib/supabase/client'
 import { formatSuccess, formatError } from '@/lib/api/responses'
+import { canCreateLeague } from '@/lib/leagues/can-create-league'
 import type { LeagueSummary, LeagueMemberWithLeague } from '@/lib/api/types'
 
 export async function GET(request: NextRequest) {
@@ -118,6 +119,27 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         formatError('SESSION_EXPIRED', 'Sessão expirada', 401),
         { status: 401 }
+      )
+    }
+
+    // Permission gate (ADR-004): the RLS `leagues_insert` WITH CHECK is the
+    // authoritative guard; this layer returns a clean 403 instead of a raw DB
+    // failure when the caller lacks the `can_create_league` capability.
+    if (!(await canCreateLeague(supabase, user.id))) {
+      console.warn(
+        JSON.stringify({
+          timestamp: new Date().toISOString(),
+          level: 'warn',
+          endpoint: '/api/leagues',
+          method: 'POST',
+          user_id: user.id,
+          status_code: 403,
+          reason: 'cannot_create_league',
+        })
+      )
+      return NextResponse.json(
+        formatError('FORBIDDEN', 'Você não tem permissão para criar ligas', 403),
+        { status: 403 }
       )
     }
 

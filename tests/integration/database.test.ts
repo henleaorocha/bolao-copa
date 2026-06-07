@@ -34,7 +34,9 @@ describe.skipIf(!HAS_SERVICE_KEY)('Database constraints', () => {
     await deleteTestUser(userId)
   })
 
-  it('new user is auto-enrolled in default league via trigger', async () => {
+  it('new user is NOT auto-enrolled in the test league (PRD league-permissions, task_02)', async () => {
+    // handle_new_user() no longer auto-enrolls new accounts into the test league
+    // (ADR-002); new users start league-less until they join or create one.
     const admin = adminClient()
     const { data, error } = await admin
       .from('league_members')
@@ -43,8 +45,7 @@ describe.skipIf(!HAS_SERVICE_KEY)('Database constraints', () => {
       .eq('league_id', DEFAULT_LEAGUE_ID)
 
     expect(error).toBeNull()
-    expect(data).toHaveLength(1)
-    expect(data![0].role).toBe('member')
+    expect(data).toHaveLength(0)
   })
 
   it('FK violation: prediction with invalid match_id fails', async () => {

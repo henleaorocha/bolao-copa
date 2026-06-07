@@ -32,6 +32,11 @@ describe.skipIf(!HAS_SERVICE_KEY)('RLS: leagues policies', () => {
     adminUserId = adminUser.id
     memberUserId = memberUser.id
 
+    // leagues_insert now gates on users.can_create_league (PRD league-permissions,
+    // task_02). Grant the creator the capability so the INSERT-path test reflects
+    // the new contract; the column defaults to false for everyone else.
+    await adminClient().from('users').update({ can_create_league: true }).eq('id', adminUserId)
+
     const league = await createTestLeague('RLS Test League', 'open', adminUserId)
     leagueId = league.id
     await addTestLeagueMember(leagueId, adminUserId, 'admin')

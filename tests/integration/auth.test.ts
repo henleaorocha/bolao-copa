@@ -12,6 +12,7 @@ import {
   createTestLeague,
   deleteTestLeague,
   addTestLeagueMember,
+  addDefaultLeagueMember,
 } from '../fixtures/factories'
 
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'
@@ -24,13 +25,19 @@ describe.skipIf(!HAS_SERVICE_KEY)('Auth flow integration', () => {
   beforeAll(async () => {
     const user = await createTestUser(email)
     userId = user.id
+    // New users are no longer auto-enrolled into the test league (PRD
+    // league-permissions, ADR-002); add the membership explicitly so the
+    // suite below can treat the test league as the user's first/fallback league.
+    await addDefaultLeagueMember(userId, 'member')
   })
 
   afterAll(async () => {
     if (userId) await deleteTestUser(userId)
   })
 
-  it('new user is auto-enrolled in default league', async () => {
+  it('user explicitly added to the test league is a member (no auto-enroll)', async () => {
+    // The user is a member only because beforeAll called addDefaultLeagueMember();
+    // the handle_new_user() trigger no longer enrolls new accounts (ADR-002).
     const admin = adminClient()
     const { data, error } = await admin
       .from('league_members')

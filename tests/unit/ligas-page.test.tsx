@@ -13,6 +13,7 @@ import type { LeagueHubItem } from '@/lib/api/types'
 const mockRedirect = vi.hoisted(() => vi.fn())
 const mockGetSupabaseServerClient = vi.hoisted(() => vi.fn())
 const mockGetLeaguesHub = vi.hoisted(() => vi.fn())
+const mockCanCreateLeague = vi.hoisted(() => vi.fn())
 const mockGetDaysUntilCopa = vi.hoisted(() => vi.fn())
 
 vi.mock('next/navigation', () => ({ redirect: mockRedirect }))
@@ -23,6 +24,10 @@ vi.mock('@/lib/supabase/client', () => ({
 
 vi.mock('@/lib/leagues/get-leagues-hub', () => ({
   getLeaguesHub: mockGetLeaguesHub,
+}))
+
+vi.mock('@/lib/leagues/can-create-league', () => ({
+  canCreateLeague: mockCanCreateLeague,
 }))
 
 vi.mock('@/lib/leagues/get-days-until-copa', () => ({
@@ -79,6 +84,10 @@ function makeSupabase(user: ReturnType<typeof makeUser> | null) {
     auth: {
       getUser: vi.fn().mockResolvedValue({ data: { user }, error: null }),
     },
+    // ensureUserSynced() upserts the public.users row on the no-invite landing.
+    from: vi.fn().mockReturnValue({
+      upsert: vi.fn().mockResolvedValue({ data: null, error: null }),
+    }),
   }
 }
 
@@ -94,6 +103,8 @@ describe('LigasPage — async Server Component', () => {
     // Default happy-path state
     mockGetSupabaseServerClient.mockResolvedValue(makeSupabase(makeUser()))
     mockGetLeaguesHub.mockResolvedValue([])
+    // Default to the common case: a regular user who cannot create leagues.
+    mockCanCreateLeague.mockResolvedValue(false)
     mockGetDaysUntilCopa.mockReturnValue({ days: 21, isUnderway: false })
   })
 
@@ -180,16 +191,19 @@ describe('LigasPage — async Server Component', () => {
     expect(cards[1]).toHaveAttribute('data-testid', 'card-second')
   })
 
-  // ── "Criar nova liga" card ──────────────────────────────────────────────
+  // ── "Criar nova liga" card — capability-gated (ADR-001) ─────────────────
 
-  it('renders the "Criar nova liga" card via <CreateLeagueModal />', async () => {
+  it('renders the "Criar nova liga" card when canCreateLeague() resolves true', async () => {
+    mockCanCreateLeague.mockResolvedValue(true)
+
     const ui = await LigasPage()
     render(ui)
 
     expect(screen.getByTestId('create-league-card')).toBeInTheDocument()
   })
 
-  it('"Criar nova liga" card is always rendered regardless of league count', async () => {
+  it('renders the create card alongside leagues for a capable user', async () => {
+    mockCanCreateLeague.mockResolvedValue(true)
     mockGetLeaguesHub.mockResolvedValue([
       makeLeague({ id: 'x', name: 'X' }),
       makeLeague({ id: 'y', name: 'Y' }),
@@ -199,6 +213,76 @@ describe('LigasPage — async Server Component', () => {
     render(ui)
 
     expect(screen.getByTestId('create-league-card')).toBeInTheDocument()
+    expect(screen.getByTestId('card-x')).toBeInTheDocument()
+    expect(screen.getByTestId('card-y')).toBeInTheDocument()
+  })
+
+  it('hides the create card entirely when canCreateLeague() resolves false', async () => {
+    mockCanCreateLeague.mockResolvedValue(false)
+    mockGetLeaguesHub.mockResolvedValue([makeLeague({ id: 'x', name: 'X' })])
+
+    const ui = await LigasPage()
+    render(ui)
+
+    expect(screen.queryByTestId('create-league-card')).not.toBeInTheDocument()
+    // The user's leagues still render — only the create entry point is gated.
+    expect(screen.getByTestId('card-x')).toBeInTheDocument()
+  })
+
+  it('renders no disabled/hinted create control for a non-capable user', async () => {
+    mockCanCreateLeague.mockResolvedValue(false)
+    mockGetLeaguesHub.mockResolvedValue([makeLeague({ id: 'x', name: 'X' })])
+
+    const ui = await LigasPage()
+    render(ui)
+
+    // Hide, do not disable: no create card and no "Criar nova liga" text anywhere.
+    expect(screen.queryByTestId('create-league-card')).not.toBeInTheDocument()
+    expect(screen.queryByText(/criar nova liga/i)).not.toBeInTheDocument()
+  })
+
+  it('passes the authed user id to canCreateLeague()', async () => {
+    const ui = await LigasPage()
+    render(ui)
+
+    expect(mockCanCreateLeague).toHaveBeenCalledWith(expect.anything(), 'user-1')
+  })
+
+  // ── No-league empty state (ADR-005) ─────────────────────────────────────
+
+  it('renders the no-league empty state when the hub list is empty for a non-capable user', async () => {
+    mockCanCreateLeague.mockResolvedValue(false)
+    mockGetLeaguesHub.mockResolvedValue([])
+
+    const ui = await LigasPage()
+    render(ui)
+
+    expect(screen.getByTestId('no-league-empty-state')).toBeInTheDocument()
+    // Guidance must point to an invite link to join.
+    expect(screen.getByText(/link de convite/i)).toBeInTheDocument()
+    // No create control for this user.
+    expect(screen.queryByTestId('create-league-card')).not.toBeInTheDocument()
+  })
+
+  it('does NOT render the empty state when the user has at least one league', async () => {
+    mockGetLeaguesHub.mockResolvedValue([makeLeague({ id: 'x', name: 'X' })])
+
+    const ui = await LigasPage()
+    render(ui)
+
+    expect(screen.queryByTestId('no-league-empty-state')).not.toBeInTheDocument()
+    expect(screen.getByTestId('card-x')).toBeInTheDocument()
+  })
+
+  it('a capable user with zero leagues keeps the hub layout (create card, no bare empty state)', async () => {
+    mockCanCreateLeague.mockResolvedValue(true)
+    mockGetLeaguesHub.mockResolvedValue([])
+
+    const ui = await LigasPage()
+    render(ui)
+
+    expect(screen.getByTestId('create-league-card')).toBeInTheDocument()
+    expect(screen.queryByTestId('no-league-empty-state')).not.toBeInTheDocument()
   })
 
   // ── CountdownBanner ─────────────────────────────────────────────────────

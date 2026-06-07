@@ -25,6 +25,7 @@ export interface AuthUser {
   avatar_url: string | null
   avatar_color: string
   created_at: string
+  can_create_league: boolean
 }
 
 export interface LeagueContext {
@@ -106,7 +107,9 @@ export interface LeagueDetail extends LeagueSummary {
 
 export interface AuthMeResponse {
   user: AuthUser
-  league: LeagueSummary
+  // `null` when the caller has no active league — a valid state since new
+  // users are no longer auto-enrolled into any league (ADR-005).
+  league: LeagueSummary | null
 }
 
 export interface LeagueMemberWithLeague {

@@ -41,6 +41,7 @@ function makeUser(overrides: Partial<AuthUser> = {}): AuthUser {
     avatar_url: null,
     avatar_color: '#FF5733',
     created_at: '2024-01-01T00:00:00Z',
+    can_create_league: false,
     ...overrides,
   }
 }

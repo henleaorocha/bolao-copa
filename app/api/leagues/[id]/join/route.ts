@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getSupabaseServerClient } from '@/lib/supabase/client'
 import { formatSuccess, formatError } from '@/lib/api/responses'
+import { ensureUserSynced } from '@/lib/user-sync'
 import type { LeagueSummary } from '@/lib/api/types'
 
 export async function POST(
@@ -26,6 +27,13 @@ export async function POST(
     }
 
     const { id: leagueId } = await params
+
+    // Self-heal: guarantee a public.users row exists before inserting into
+    // league_members. The handle_new_user trigger only fires on the FIRST auth
+    // signup, so a user whose public.users row was removed (while auth.users
+    // survived) would otherwise hit a foreign-key violation
+    // (league_members_user_id_fkey → users.id) here and get a 500.
+    await ensureUserSynced(supabase, user)
 
     // Parse body
     let body: unknown

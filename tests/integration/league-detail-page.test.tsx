@@ -113,6 +113,7 @@ const mockUser: AuthUser = {
   avatar_url: null,
   avatar_color: '#3B82F6',
   created_at: '2026-01-01T00:00:00Z',
+  can_create_league: false,
 }
 
 const mockLeague: LeagueDetail = {
