@@ -454,6 +454,59 @@ describe('GET /api/leagues/[id]/ranking — ordering', () => {
     expect(json.data.ranking[1].position).toBe(2)
   })
 
+  it('tie-break by exact count beats most-recent: more cravadas ranks higher even if the other has a newer single exact', async () => {
+    const members = [
+      makeMemberRow({
+        user_id: 'user-A',
+        joined_at: '2026-01-01T00:00:00Z',
+        users: [{ full_name: 'Zara', avatar_color: '#111' }],
+      }),
+      makeMemberRow({
+        user_id: 'user-B',
+        joined_at: '2026-01-03T00:00:00Z',
+        users: [{ full_name: 'Ana', avatar_color: '#222' }],
+      }),
+    ]
+    vi.mocked(getSupabaseServerClient).mockResolvedValue(
+      makeSupabase({
+        user: { id: 'user-A' },
+        membersResult: { data: members, error: null },
+        predictionsResult: {
+          data: [
+            // user-A: 2 exact scores on earlier matches → 20 pts, 2 cravadas
+            { user_id: 'user-A', match_id: 'match-1', predicted_home_score: 2, predicted_away_score: 1 },
+            { user_id: 'user-A', match_id: 'match-2', predicted_home_score: 1, predicted_away_score: 0 },
+            // user-B: 1 exact (newer) + 2 correct-outcome → 20 pts, 1 cravada (most recent of all)
+            { user_id: 'user-B', match_id: 'match-3', predicted_home_score: 3, predicted_away_score: 2 },
+            { user_id: 'user-B', match_id: 'match-4', predicted_home_score: 1, predicted_away_score: 0 },
+            { user_id: 'user-B', match_id: 'match-5', predicted_home_score: 1, predicted_away_score: 0 },
+          ],
+          error: null,
+        },
+        finishedMatchesResult: {
+          data: [
+            makeFinishedMatch({ id: 'match-1', home_score: 2, away_score: 1, match_date: '2026-01-15T15:00:00Z' }),
+            makeFinishedMatch({ id: 'match-2', home_score: 1, away_score: 0, match_date: '2026-02-15T15:00:00Z' }),
+            makeFinishedMatch({ id: 'match-3', home_score: 3, away_score: 2, match_date: '2026-03-15T15:00:00Z' }),
+            makeFinishedMatch({ id: 'match-4', home_score: 3, away_score: 0, match_date: '2026-01-10T15:00:00Z' }),
+            makeFinishedMatch({ id: 'match-5', home_score: 2, away_score: 0, match_date: '2026-01-11T15:00:00Z' }),
+          ],
+          error: null,
+        },
+      }) as never
+    )
+    const res = await GET(makeRequest(), makeParams())
+    const json = await res.json()
+    // Both 20 points. user-A has 2 cravadas vs user-B's 1 (whose single exact is newer).
+    // "more cravadas" outranks "most recent exact" → user-A first.
+    expect(json.data.ranking[0].user_id).toBe('user-A')
+    expect(json.data.ranking[0].exact_scores).toBe(2)
+    expect(json.data.ranking[0].points).toBe(20)
+    expect(json.data.ranking[1].user_id).toBe('user-B')
+    expect(json.data.ranking[1].exact_scores).toBe(1)
+    expect(json.data.ranking[1].points).toBe(20)
+  })
+
   it('all-zero league: members ordered alphabetically (pt-BR)', async () => {
     const members = [
       makeMemberRow({

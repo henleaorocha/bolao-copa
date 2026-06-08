@@ -149,6 +149,8 @@ export function computeRanking(args: RankingComputeArgs): RankingFullEntry[] {
     const bHasExact = b.mostRecentExactDate !== null ? 1 : 0
     if (bHasExact !== aHasExact) return bHasExact - aHasExact
 
+    if (b.exact_scores !== a.exact_scores) return b.exact_scores - a.exact_scores
+
     if (a.mostRecentExactDate !== null && b.mostRecentExactDate !== null) {
       if (b.mostRecentExactDate !== a.mostRecentExactDate) {
         return b.mostRecentExactDate > a.mostRecentExactDate ? 1 : -1

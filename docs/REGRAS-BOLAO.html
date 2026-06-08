@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Regras · Bolão da Copa 2026</title>
+<style>
+  :root{
+    --navy:#244C5A;
+    --navy-dark:#1a3a47;
+    --teal:#0097A9;
+    --gold:#FFC72C;
+    --green:#4CAF82;
+    --ink:#1C3A45;
+    --muted:#5b7480;
+    --line:#e6edf0;
+    --bg:#f4f7f8;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    font-family:'Inter','Segoe UI',system-ui,-apple-system,Arial,sans-serif;
+    background:var(--bg);
+    color:var(--ink);
+    line-height:1.55;
+    padding:24px 16px 64px;
+  }
+  .page{max-width:760px;margin:0 auto}
+
+  /* ---------- HERO ---------- */
+  .hero{
+    background:linear-gradient(135deg,var(--navy) 0%,var(--navy-dark) 100%);
+    border-radius:28px;
+    padding:38px 32px;
+    color:#fff;
+    position:relative;
+    overflow:hidden;
+    box-shadow:0 24px 60px rgba(36,76,90,.28);
+  }
+  .hero::after{
+    content:"";position:absolute;inset:0;
+    background-image:linear-gradient(var(--gold) 1px,transparent 1px),linear-gradient(90deg,var(--gold) 1px,transparent 1px);
+    background-size:40px 40px;opacity:.05;pointer-events:none;
+  }
+  .badge{
+    display:inline-flex;align-items:center;gap:8px;
+    background:rgba(255,199,44,.16);
+    border:1px solid rgba(255,199,44,.35);
+    color:var(--gold);
+    font-size:12px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;
+    padding:6px 14px;border-radius:999px;position:relative;z-index:1;
+  }
+  .hero h1{
+    font-size:40px;line-height:1.05;font-weight:900;letter-spacing:-.03em;
+    margin:18px 0 8px;position:relative;z-index:1;
+  }
+  .hero h1 .trophy{
+    display:inline-grid;place-items:center;width:46px;height:46px;
+    background:var(--gold);border-radius:12px;font-size:26px;vertical-align:-8px;margin-right:6px;
+  }
+  .hero p{font-size:15px;color:#cfe0e6;max-width:46ch;position:relative;z-index:1}
+  .hero .meta{
+    display:flex;gap:26px;margin-top:22px;position:relative;z-index:1;flex-wrap:wrap;
+  }
+  .hero .meta b{display:block;font-size:22px;font-weight:900;color:var(--gold)}
+  .hero .meta span{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:#9fb6bf}
+
+  /* ---------- SECTION ---------- */
+  section{
+    background:#fff;border:1px solid var(--line);border-radius:20px;
+    padding:26px 26px 24px;margin-top:18px;
+    box-shadow:0 2px 10px rgba(36,76,90,.04);
+  }
+  .sec-head{display:flex;align-items:center;gap:12px;margin-bottom:6px}
+  .sec-ico{
+    flex:none;width:38px;height:38px;border-radius:11px;display:grid;place-items:center;font-size:19px;
+  }
+  .ico-teal{background:rgba(0,151,169,.1)}
+  .ico-gold{background:rgba(255,199,44,.18)}
+  .ico-navy{background:rgba(36,76,90,.1)}
+  .ico-green{background:rgba(76,175,130,.14)}
+  h2{font-size:19px;font-weight:900;letter-spacing:-.01em;color:var(--navy)}
+  .sec-sub{font-size:13.5px;color:var(--muted);margin:2px 0 16px 50px}
+  @media (max-width:520px){.sec-sub{margin-left:0}}
+
+  /* ---------- POINTS TABLE ---------- */
+  .rows{border-top:1px solid var(--line)}
+  .row{
+    display:flex;align-items:center;justify-content:space-between;gap:14px;
+    padding:13px 2px;border-bottom:1px solid var(--line);
+  }
+  .row .label{font-size:14.5px;font-weight:700;color:var(--navy)}
+  .row .desc{font-size:12.5px;color:var(--muted);margin-top:1px}
+  .pill{
+    flex:none;font-size:13px;font-weight:800;color:var(--teal);
+    background:rgba(0,151,169,.09);padding:5px 13px;border-radius:999px;white-space:nowrap;
+  }
+  .pill.gold{color:#9a7400;background:rgba(255,199,44,.22)}
+  .pill.zero{color:var(--muted);background:#eef2f4}
+  .pill.x{color:var(--navy);background:rgba(36,76,90,.09)}
+
+  /* ---------- EXAMPLE CHIPS ---------- */
+  .note{
+    margin-top:16px;background:var(--bg);border-radius:14px;padding:14px 16px;
+    font-size:13.5px;color:#3c5560;
+  }
+  .note b{color:var(--navy)}
+  .ex{display:flex;align-items:center;gap:10px;margin-top:8px;flex-wrap:wrap}
+  .ex:first-of-type{margin-top:10px}
+  .score{
+    font-weight:800;font-size:13px;background:#fff;border:1px solid var(--line);
+    border-radius:8px;padding:3px 9px;color:var(--navy);
+  }
+  .arrow{color:var(--muted);font-weight:700}
+  .res{font-weight:800;font-size:12.5px;padding:3px 10px;border-radius:999px}
+  .res.win{color:#1f7a4d;background:rgba(76,175,130,.16)}
+  .res.mid{color:#9a7400;background:rgba(255,199,44,.22)}
+  .res.no{color:#9a5040;background:rgba(251,146,60,.16)}
+
+  /* ---------- DEADLINE CARDS ---------- */
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:4px}
+  @media (max-width:520px){.grid2{grid-template-columns:1fr}}
+  .dl{border:1px solid var(--line);border-radius:16px;padding:18px;background:#fdfefe}
+  .dl .k{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--teal);margin-bottom:8px}
+  .dl .big{font-size:17px;font-weight:900;color:var(--navy);line-height:1.25}
+  .dl p{font-size:13px;color:var(--muted);margin-top:7px}
+
+  /* ---------- TIEBREAK STEPS ---------- */
+  ol.steps{list-style:none;counter-reset:s;margin-top:4px}
+  ol.steps li{
+    counter-increment:s;display:flex;gap:14px;align-items:flex-start;
+    padding:13px 0;border-bottom:1px solid var(--line);
+  }
+  ol.steps li:last-child{border-bottom:0}
+  ol.steps li::before{
+    content:counter(s);flex:none;width:30px;height:30px;border-radius:9px;
+    background:var(--navy);color:var(--gold);font-weight:900;font-size:14px;
+    display:grid;place-items:center;margin-top:1px;
+  }
+  ol.steps .t{font-size:14.5px;font-weight:800;color:var(--navy)}
+  ol.steps .d{font-size:13px;color:var(--muted);margin-top:1px}
+
+  .tip{
+    display:flex;gap:11px;align-items:flex-start;
+    background:rgba(0,151,169,.06);border:1px solid rgba(0,151,169,.18);
+    border-radius:14px;padding:14px 16px;margin-top:16px;font-size:13.5px;color:#27535d;
+  }
+  .tip b{color:var(--teal)}
+
+  footer{
+    text-align:center;margin-top:30px;font-size:12.5px;color:var(--muted);
+  }
+  footer .dot{color:var(--gold)}
+
+  @media print{
+    body{background:#fff;padding:0}
+    section,.hero{box-shadow:none}
+    section{break-inside:avoid}
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- HERO -->
+  <div class="hero">
+    <span class="badge">⚽ Copa do Mundo · USA · CAN · MEX</span>
+    <h1><span class="trophy">🏆</span>Regras do Bolão</h1>
+    <p>Tudo que você precisa saber para palpitar, pontuar e brigar pelo topo da tabela. Boa sorte — e que vença o melhor chute!</p>
+  </div>
+
+  <!-- COMO FUNCIONA -->
+  <section>
+    <div class="sec-head">
+      <div class="sec-ico ico-teal">🎯</div>
+      <h2>Como funciona</h2>
+    </div>
+    <p class="sec-sub">São dois tipos de palpite, e os dois valem pontos.</p>
+    <div class="rows" style="border-top:0">
+      <div class="row">
+        <div>
+          <div class="label">Palpite de placar</div>
+          <div class="desc">Você crava o placar de cada um dos jogos da Copa, da fase de grupos até a final.</div>
+        </div>
+        <span class="pill x">104 jogos</span>
+      </div>
+      <div class="row">
+        <div>
+          <div class="label">Palpite de campeão e vice</div>
+          <div class="desc">Antes da bola rolar, você aposta em quem leva a taça e quem fica com o vice.</div>
+        </div>
+        <span class="pill gold">+75 pts</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- PONTUAÇÃO GRUPOS -->
+  <section>
+    <div class="sec-head">
+      <div class="sec-ico ico-gold">📊</div>
+      <h2>Pontuação dos jogos</h2>
+    </div>
+    <p class="sec-sub">Vale para todos os jogos. Na fase de grupos, os pontos são estes:</p>
+    <div class="rows">
+      <div class="row">
+        <div>
+          <div class="label">Placar exato</div>
+          <div class="desc">Acertou o resultado certinho, gol a gol</div>
+        </div>
+        <span class="pill">+10 pts</span>
+      </div>
+      <div class="row">
+        <div>
+          <div class="label">Vencedor / empate certo</div>
+          <div class="desc">Acertou quem ganhou (ou o empate), mas errou o placar</div>
+        </div>
+        <span class="pill gold">+5 pts</span>
+      </div>
+      <div class="row">
+        <div>
+          <div class="label">Errou o resultado</div>
+          <div class="desc">Apostou no time errado</div>
+        </div>
+        <span class="pill zero">0 pts</span>
+      </div>
+    </div>
+
+    <div class="note">
+      <b>O que conta como “acertar o vencedor”?</b> É só comparar quem ganha. Se você previu vitória da casa e a casa venceu — mesmo com placar diferente — são 5 pontos.
+      <div class="ex">
+        <span class="score">Você: 2 × 1</span><span class="arrow">→</span><span class="score">Real: 3 × 0</span>
+        <span class="res win">+5 · vitória da casa</span>
+      </div>
+      <div class="ex">
+        <span class="score">Você: 1 × 1</span><span class="arrow">→</span><span class="score">Real: 2 × 2</span>
+        <span class="res mid">+5 · empate</span>
+      </div>
+      <div class="ex">
+        <span class="score">Você: 2 × 1</span><span class="arrow">→</span><span class="score">Real: 0 × 2</span>
+        <span class="res no">0 · resultado trocado</span>
+      </div>
+      <div class="ex">
+        <span class="score">Você: 3 × 0</span><span class="arrow">→</span><span class="score">Real: 3 × 0</span>
+        <span class="res win">+10 · placar exato</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- MATA-MATA -->
+  <section>
+    <div class="sec-head">
+      <div class="sec-ico ico-navy">🔥</div>
+      <h2>Mata-mata vale mais</h2>
+    </div>
+    <p class="sec-sub">No mata-mata, os mesmos pontos do placar (10 ou 5) são <b>multiplicados</b> conforme a fase. Quanto mais decisivo o jogo, mais pesa.</p>
+    <div class="rows">
+      <div class="row">
+        <div><div class="label">16 avos de final</div><div class="desc">Placar exato = 15 pts · vencedor = 7,5 pts</div></div>
+        <span class="pill x">1,5×</span>
+      </div>
+      <div class="row">
+        <div><div class="label">Oitavas de final</div><div class="desc">Placar exato = 20 pts · vencedor = 10 pts</div></div>
+        <span class="pill x">2×</span>
+      </div>
+      <div class="row">
+        <div><div class="label">Quartas de final</div><div class="desc">Placar exato = 25 pts · vencedor = 12,5 pts</div></div>
+        <span class="pill x">2,5×</span>
+      </div>
+      <div class="row">
+        <div><div class="label">Semifinais</div><div class="desc">Placar exato = 30 pts · vencedor = 15 pts</div></div>
+        <span class="pill x">3×</span>
+      </div>
+      <div class="row">
+        <div><div class="label">Disputa de 3º lugar</div><div class="desc">Placar exato = 35 pts · vencedor = 17,5 pts</div></div>
+        <span class="pill x">3,5×</span>
+      </div>
+      <div class="row">
+        <div><div class="label">Final</div><div class="desc">Placar exato = 40 pts · vencedor = 20 pts</div></div>
+        <span class="pill x">4×</span>
+      </div>
+    </div>
+    <div class="tip">
+      <span>🔓</span>
+      <div>Você só consegue palpitar num jogo do mata-mata depois que os <b>dois times estiverem confirmados</b>. Enquanto a chave não fecha (ex.: “1º do Grupo A”), o palpite fica bloqueado.</div>
+    </div>
+  </section>
+
+  <!-- CAMPEÃO E VICE -->
+  <section>
+    <div class="sec-head">
+      <div class="sec-ico ico-gold">👑</div>
+      <h2>Palpite de campeão e vice</h2>
+    </div>
+    <p class="sec-sub">Sua aposta de longo prazo. Os pontos só caem depois da final.</p>
+    <div class="rows" style="border-top:0">
+      <div class="row">
+        <div><div class="label">Acertar o campeão</div><div class="desc">Quem levanta a taça</div></div>
+        <span class="pill gold">+50 pts</span>
+      </div>
+      <div class="row">
+        <div><div class="label">Acertar o vice</div><div class="desc">Quem perde a final</div></div>
+        <span class="pill gold">+25 pts</span>
+      </div>
+      <div class="row">
+        <div><div class="label">Acertar os dois</div><div class="desc">Campeão e vice certinhos</div></div>
+        <span class="pill gold">+75 pts</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- HORÁRIOS LIMITE -->
+  <section>
+    <div class="sec-head">
+      <div class="sec-ico ico-teal">⏰</div>
+      <h2>Horários-limite dos palpites</h2>
+    </div>
+    <p class="sec-sub">Depois do prazo, o palpite trava e não dá mais para mudar. Fique de olho no relógio!</p>
+    <div class="grid2">
+      <div class="dl">
+        <div class="k">Palpite de placar</div>
+        <div class="big">Até 1 hora antes de cada jogo</div>
+        <p>Cada partida fecha sozinha 60 minutos antes do apito inicial. Palpitou depois disso? Não entra.</p>
+      </div>
+      <div class="dl">
+        <div class="k">Campeão e vice</div>
+        <div class="big">Antes do jogo de abertura</div>
+        <p>Trava em 11/06/2026, às 15h (horário de Brasília), no apito inicial da Copa. Defina antes!</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- DESEMPATE -->
+  <section>
+    <div class="sec-head">
+      <div class="sec-ico ico-green">⚖️</div>
+      <h2>Critérios de desempate</h2>
+    </div>
+    <p class="sec-sub">A classificação segue esta ordem, um critério de cada vez:</p>
+    <ol class="steps">
+      <li>
+        <div>
+          <div class="t">Mais pontos no total</div>
+          <div class="d">Quem somou mais pontos fica na frente. (É o critério principal.)</div>
+        </div>
+      </li>
+      <li>
+        <div>
+          <div class="t">Quem tem placar exato</div>
+          <div class="d">Empatou nos pontos? Quem cravou pelo menos um placar exato sobe na frente de quem não cravou nenhum.</div>
+        </div>
+      </li>
+      <li>
+        <div>
+          <div class="t">Mais cravadas</div>
+          <div class="d">Os dois cravaram? Quem tem o maior número de placares exatos no total leva a melhor.</div>
+        </div>
+      </li>
+      <li>
+        <div>
+          <div class="t">Cravada mais recente</div>
+          <div class="d">Empataram até no número de cravadas? Aí vale quem acertou o placar exato no jogo mais recente.</div>
+        </div>
+      </li>
+      <li>
+        <div>
+          <div class="t">Ordem alfabética</div>
+          <div class="d">Persistindo o empate, vale a ordem alfabética do nome — só para não ficar nada indefinido.</div>
+        </div>
+      </li>
+    </ol>
+  </section>
+
+  <footer>
+    🏆 <b>Bolão da Copa 2026</b> <span class="dot">·</span> Bom jogo a todos!
+  </footer>
+
+</div>
+</body>
+</html>
