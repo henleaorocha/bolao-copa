@@ -14,9 +14,19 @@ const SCORING_ROWS = [
 export default function ScoringSchemeCard() {
   return (
     <div className="rounded-xl bg-white border border-slate-100 shadow-sm p-4">
-      <h2 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-3">
-        Tabela de Pontos
-      </h2>
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-xs font-bold uppercase tracking-widest text-slate-400">
+          Tabela de Pontos
+        </h2>
+        <a
+          href="/regras.html"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-xs font-bold text-[#0097A9] hover:underline"
+        >
+          Ver regras completas →
+        </a>
+      </div>
       <div className="divide-y divide-slate-100">
         {SCORING_ROWS.map(row => (
           <div key={row.label} className="flex items-center justify-between gap-2 py-2">

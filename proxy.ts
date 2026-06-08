@@ -3,7 +3,9 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 // Páginas acessíveis sem autenticação
-const PAGINAS_PUBLICAS  = ['/', '/login', '/auth/callback']
+// /regras.html é estático (public/) e não-sensível: liberado para abrir no app
+// e ser compartilhado por link (ex: WhatsApp) sem exigir login.
+const PAGINAS_PUBLICAS  = ['/', '/login', '/auth/callback', '/regras.html']
 // Rotas de API acessíveis sem autenticação de sessão.
 // /api/admin/sync-matches não usa sessão: é chamada pelo cron (pg_cron) com
 // `Authorization: Bearer <service_role_key>`, validada dentro do próprio handler.
