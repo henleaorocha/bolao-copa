@@ -87,6 +87,15 @@ export async function GET(
     }
 
     if (nextParam) {
+      // Próximos jogos a partir do dia de hoje (horário de Brasília, UTC-3 fixo):
+      // um jogo de hoje continua aparecendo mesmo após começar/terminar; ao virar
+      // o dia em Brasília ele some e entram os jogos do novo dia atual.
+      const todaySP = new Date().toLocaleDateString('sv-SE', {
+        timeZone: 'America/Sao_Paulo',
+      })
+      const startOfTodaySP = new Date(`${todaySP}T00:00:00-03:00`)
+      matchesQuery = matchesQuery.gte('match_date', startOfTodaySP.toISOString())
+
       const limit = parseInt(nextParam, 10)
       if (!isNaN(limit) && limit > 0) {
         matchesQuery = matchesQuery.limit(limit)

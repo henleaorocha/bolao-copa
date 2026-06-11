@@ -50,7 +50,7 @@ export default function PalpitesPage() {
   const [allMatches, setAllMatches] = useState<MatchWithPrediction[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [activeDate, setActiveDate] = useState<DateFilter>('all')
+  const [activeDate, setActiveDate] = useState<DateFilter>('today')
   const [activeGroup, setActiveGroup] = useState<string>('all')
   const [inputValues, setInputValues] = useState<InputValues>({})
   const [saving, setSaving] = useState(false)
