@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 import { getSupabaseServerClient } from '@/lib/supabase/client'
 import { formatSuccess, formatError } from '@/lib/api/responses'
 import { computeRanking } from '@/lib/ranking'
+import { BET_DEADLINE } from '@/lib/copa-teams'
 import type { RankingFullEntry } from '@/lib/api/types'
 
 interface UserEmbed {
@@ -110,7 +112,18 @@ export async function GET(
       )
     }
 
-    const { data: allChampBets } = await supabase
+    // Read every member's champion/runner-up pick with a service-role client to
+    // bypass the per-row owner filter in RLS (champion_bets_select_league_peers
+    // only reveals peers' bets after the final is finished). The membership
+    // guard above already proved the caller belongs to this league, and the
+    // reveal is gated in app code by BET_DEADLINE below — so we read all picks
+    // here and decide visibility centrally.
+    const adminSupabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+
+    const { data: allChampBets } = await adminSupabase
       .from('champion_bets')
       .select('user_id, champion_team, runner_up_team')
       .eq('league_id', leagueId)
@@ -145,6 +158,16 @@ export async function GET(
         runner_up_team: b.runner_up_team,
       })),
     })
+
+    // Champion/runner-up picks are private until betting closes, so members
+    // can't copy each other's votes. Strip them from the payload entirely
+    // before the deadline; afterwards every member's picks are public.
+    if (Date.now() < BET_DEADLINE.getTime()) {
+      for (const entry of ranking) {
+        entry.champion_team = null
+        entry.runner_up_team = null
+      }
+    }
 
     const duration = Date.now() - start
     console.log(

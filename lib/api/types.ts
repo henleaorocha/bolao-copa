@@ -86,6 +86,8 @@ export interface RankingFullEntry {
   position: number
   exact_scores: number
   correct_outcomes: number
+  champion_team: string | null
+  runner_up_team: string | null
 }
 
 export interface LeagueDetail extends LeagueSummary {

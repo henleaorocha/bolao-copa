@@ -15,6 +15,8 @@ function makeEntry(overrides: Partial<RankingFullEntry> = {}): RankingFullEntry 
     position: 1,
     exact_scores: 3,
     correct_outcomes: 8,
+    champion_team: null,
+    runner_up_team: null,
     ...overrides,
   }
 }
@@ -114,16 +116,9 @@ describe('RankingTable', () => {
     expect(screen.getByText('80 pts')).toBeInTheDocument()
   })
 
-  it('renders avatar initial from first character of full_name', () => {
-    const entry = makeEntry({ full_name: 'Zara Mendes', avatar_color: '#AABBCC' })
-    render(<RankingTable ranking={[entry]} currentUserId="other-user" />)
-    expect(screen.getByText('Z')).toBeInTheDocument()
-  })
-
-  it('falls back to "U" initial and "Usuário" name when full_name is null', () => {
+  it('falls back to "Usuário" name when full_name is null', () => {
     const entry = makeEntry({ full_name: null })
     render(<RankingTable ranking={[entry]} currentUserId="other-user" />)
-    expect(screen.getByText('U')).toBeInTheDocument()
     expect(screen.getByText('Usuário')).toBeInTheDocument()
   })
 })

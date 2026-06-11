@@ -5,6 +5,30 @@ vi.mock('@/lib/supabase/client', () => ({
   getSupabaseServerClient: vi.fn(),
 }))
 
+// The route reads champion_bets with a service-role client (createClient from
+// @supabase/supabase-js) to bypass the per-row owner RLS filter. Mock it to
+// serve whatever champBetsResult the current makeSupabase() was configured with,
+// shared via vi.hoisted so the mock factory can reach it despite hoisting.
+const { champBetsState } = vi.hoisted(() => ({
+  champBetsState: { current: { data: [] as unknown, error: null as unknown } },
+}))
+
+vi.mock('@supabase/supabase-js', () => ({
+  createClient: () => ({
+    from: (table: string) => {
+      if (table === 'champion_bets') {
+        const promise = Promise.resolve(champBetsState.current)
+        const thenable = {
+          then: promise.then.bind(promise),
+          catch: promise.catch.bind(promise),
+        }
+        return { select: () => ({ eq: () => thenable }) }
+      }
+      return {}
+    },
+  }),
+}))
+
 import { GET } from '@/app/api/leagues/[id]/ranking/route'
 import { getSupabaseServerClient } from '@/lib/supabase/client'
 
@@ -77,6 +101,10 @@ function makeSupabase(overrides?: {
     finishedMatchesResult: { data: [], error: null },
     ...overrides,
   }
+
+  // Champion bets are read via the service-role client (mocked above), so expose
+  // this instance's champBetsResult to that mock.
+  champBetsState.current = opts.champBetsResult
 
   let leagueMembersCallCount = 0
 

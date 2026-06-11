@@ -78,6 +78,8 @@ export function computeRanking(args: RankingComputeArgs): RankingFullEntry[] {
     exact_scores: number
     correct_outcomes: number
     mostRecentExactDate: string | null
+    champion_team: string | null
+    runner_up_team: string | null
   }
 
   const accums: MemberAccum[] = members.map((member) => {
@@ -139,6 +141,8 @@ export function computeRanking(args: RankingComputeArgs): RankingFullEntry[] {
       exact_scores,
       correct_outcomes,
       mostRecentExactDate,
+      champion_team: champBet?.champion_team ?? null,
+      runner_up_team: champBet?.runner_up_team ?? null,
     }
   })
 
@@ -168,5 +172,7 @@ export function computeRanking(args: RankingComputeArgs): RankingFullEntry[] {
     position: idx + 1,
     exact_scores: a.exact_scores,
     correct_outcomes: a.correct_outcomes,
+    champion_team: a.champion_team,
+    runner_up_team: a.runner_up_team,
   }))
 }

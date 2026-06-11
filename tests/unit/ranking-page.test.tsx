@@ -83,6 +83,8 @@ function makeEntry(overrides: Partial<RankingFullEntry> = {}): RankingFullEntry 
     position: 1,
     exact_scores: 3,
     correct_outcomes: 8,
+    champion_team: null,
+    runner_up_team: null,
     ...overrides,
   }
 }
