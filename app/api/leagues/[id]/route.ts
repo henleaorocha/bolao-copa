@@ -3,6 +3,7 @@ import { getSupabaseServerClient } from '@/lib/supabase/client'
 import { formatSuccess, formatError } from '@/lib/api/responses'
 import type { LeagueDetail, LeagueMember, RankingEntry, UserStats } from '@/lib/api/types'
 import { computeRanking } from '@/lib/ranking'
+import { fetchAllLeaguePredictions } from '@/lib/predictions'
 
 interface UserEmbed {
   full_name: string | null
@@ -148,11 +149,11 @@ export async function GET(
       console.error('[api/leagues/[id] GET] champion_bets error:', champBetsError.message)
     }
 
-    // Load all predictions for this league
-    const { data: allPredictions, error: predictionsError } = await supabase
-      .from('predictions')
-      .select('user_id, match_id, predicted_home_score, predicted_away_score')
-      .eq('league_id', leagueId)
+    // Load all predictions for this league. Paginated: a single PostgREST select
+    // caps at 1000 rows and silently truncates larger leagues, which scored the
+    // cut-off members as 0 in the ranking below.
+    const { data: allPredictions, error: predictionsError } =
+      await fetchAllLeaguePredictions(supabase, leagueId)
 
     if (predictionsError) {
       console.error('[api/leagues/[id] GET] predictions error:', predictionsError.message)

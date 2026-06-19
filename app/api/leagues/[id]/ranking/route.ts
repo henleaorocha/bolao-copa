@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { getSupabaseServerClient } from '@/lib/supabase/client'
 import { formatSuccess, formatError } from '@/lib/api/responses'
 import { computeRanking } from '@/lib/ranking'
+import { fetchAllLeaguePredictions } from '@/lib/predictions'
 import { BET_DEADLINE } from '@/lib/copa-teams'
 import type { RankingFullEntry } from '@/lib/api/types'
 
@@ -128,10 +129,26 @@ export async function GET(
       .select('user_id, champion_team, runner_up_team')
       .eq('league_id', leagueId)
 
-    const { data: allPredictions } = await supabase
-      .from('predictions')
-      .select('user_id, match_id, predicted_home_score, predicted_away_score')
-      .eq('league_id', leagueId)
+    const { data: allPredictions, error: predictionsError } =
+      await fetchAllLeaguePredictions(supabase, leagueId)
+
+    if (predictionsError) {
+      console.error(
+        JSON.stringify({
+          timestamp: new Date().toISOString(),
+          level: 'error',
+          endpoint: '/api/leagues/[id]/ranking',
+          method: 'GET',
+          user_id: user.id,
+          league_id: leagueId,
+          error: predictionsError.message,
+        })
+      )
+      return NextResponse.json(
+        formatError('DATABASE_ERROR', 'Erro ao buscar palpites da liga', 500),
+        { status: 500 }
+      )
+    }
 
     const { data: finishedMatches } = await supabase
       .from('matches')
@@ -150,7 +167,7 @@ export async function GET(
 
     const ranking: RankingFullEntry[] = computeRanking({
       members,
-      predictions: allPredictions ?? [],
+      predictions: allPredictions,
       finishedMatches: (finishedMatches ?? []) as Parameters<typeof computeRanking>[0]['finishedMatches'],
       championBets: (allChampBets ?? []).map((b) => ({
         user_id: b.user_id,

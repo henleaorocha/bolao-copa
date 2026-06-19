@@ -134,8 +134,11 @@ function makeSupabase(overrides?: {
     }
 
     if (table === 'predictions') {
-      const thenable = makeThenable(opts.predictionsResult)
-      const eq = vi.fn(() => thenable)
+      // Paginated read: .select().eq(league_id).order('id').range(from, to).
+      // Test fixtures are all < 1000 rows, so the helper reads a single page.
+      const range = vi.fn(() => makeThenable(opts.predictionsResult))
+      const order = vi.fn(() => ({ range }))
+      const eq = vi.fn(() => ({ order }))
       const select = vi.fn(() => ({ eq }))
       return { select }
     }
