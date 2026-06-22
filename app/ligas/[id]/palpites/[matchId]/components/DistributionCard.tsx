@@ -1,6 +1,12 @@
+'use client'
+
+import { useState } from 'react'
 import type { OutcomeDistribution } from '@/lib/api/types'
+import PlayerPredictionsModal from './PlayerPredictionsModal'
 
 interface DistributionCardProps {
+  leagueId: string
+  matchId: string
   homeTeam: string
   awayTeam: string
   distribution: OutcomeDistribution | null
@@ -8,11 +14,14 @@ interface DistributionCardProps {
 }
 
 export default function DistributionCard({
+  leagueId,
+  matchId,
   homeTeam,
   awayTeam,
   distribution,
   isDeadlinePassed,
 }: DistributionCardProps) {
+  const [showPlayers, setShowPlayers] = useState(false)
   const showDistribution = isDeadlinePassed && distribution !== null
 
   return (
@@ -59,7 +68,26 @@ export default function DistributionCard({
             {distribution!.total_predictions}{' '}
             {distribution!.total_predictions === 1 ? 'palpite' : 'palpites'} na liga
           </div>
+
+          <button
+            type="button"
+            onClick={() => setShowPlayers(true)}
+            className="mt-1 text-sm font-bold text-[#0097A9] hover:underline"
+            data-testid="open-player-predictions"
+          >
+            Ver palpites dos jogadores →
+          </button>
         </div>
+      )}
+
+      {showPlayers && (
+        <PlayerPredictionsModal
+          leagueId={leagueId}
+          matchId={matchId}
+          homeTeam={homeTeam}
+          awayTeam={awayTeam}
+          onClose={() => setShowPlayers(false)}
+        />
       )}
     </div>
   )

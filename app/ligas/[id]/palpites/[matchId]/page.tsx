@@ -152,6 +152,8 @@ export default function BetDetailPage() {
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <ScoringCard />
           <DistributionCard
+            leagueId={leagueId}
+            matchId={matchId}
             homeTeam={matchDetail.home_team}
             awayTeam={matchDetail.away_team}
             distribution={matchDetail.distribution}

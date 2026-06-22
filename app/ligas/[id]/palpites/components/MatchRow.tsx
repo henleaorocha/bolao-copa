@@ -177,6 +177,20 @@ export default function MatchRow({
         </div>
       )}
 
+      {/* Desktop: details link for finished matches (desktop hides the link above
+          once finished; mobile keeps its own footer link below for every state) */}
+      {isFinished && (
+        <div className="hidden lg:flex items-center justify-end px-4 pb-3">
+          <Link
+            href={`/ligas/${leagueId}/palpites/${match.id}`}
+            className="text-[10px] font-bold text-[#0097A9] hover:underline"
+            data-testid="details-link-finished-lg"
+          >
+            Detalhes →
+          </Link>
+        </div>
+      )}
+
       {/* Mobile: details link footer */}
       <div className="lg:hidden flex items-center justify-between px-3 pb-2.5 pt-0">
         <span className="flex items-center gap-1 text-[10px] text-slate-400">

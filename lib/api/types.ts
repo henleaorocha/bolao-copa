@@ -184,3 +184,27 @@ export interface OutcomeDistribution {
 export interface MatchDetail extends MatchWithPrediction {
   distribution: OutcomeDistribution | null
 }
+
+// One row per league member in the "palpites dos jogadores" modal. Revealed
+// once the betting deadline has passed (picks are locked by then); `points`
+// stays null until the match is finished and a result is published.
+export interface MatchPlayerPrediction {
+  user_id: string
+  full_name: string | null
+  avatar_color: string
+  predicted_home_score: number | null
+  predicted_away_score: number | null
+  points: number | null
+  is_exact: boolean
+  is_current_user: boolean
+}
+
+export interface MatchPlayerPredictions {
+  is_deadline_passed: boolean
+  is_finished: boolean
+  home_team: string
+  away_team: string
+  home_score: number | null
+  away_score: number | null
+  players: MatchPlayerPrediction[]
+}

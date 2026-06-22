@@ -321,15 +321,19 @@ describe('BetDetailPage', () => {
 // ── DistributionCard unit tests ──────────────────────────────────────────────
 
 describe('DistributionCard', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  const baseProps = {
+    leagueId: LEAGUE_ID,
+    matchId: MATCH_ID,
+    homeTeam: 'Brasil',
+    awayTeam: 'Argentina',
+  }
+
   it('renders locked placeholder when distribution is null', () => {
-    render(
-      <DistributionCard
-        homeTeam="Brasil"
-        awayTeam="Argentina"
-        distribution={null}
-        isDeadlinePassed={false}
-      />
-    )
+    render(<DistributionCard {...baseProps} distribution={null} isDeadlinePassed={false} />)
     expect(screen.getByTestId('distribution-locked')).toBeInTheDocument()
     expect(screen.queryByTestId('distribution-chart')).not.toBeInTheDocument()
   })
@@ -337,8 +341,7 @@ describe('DistributionCard', () => {
   it('renders locked placeholder when is_deadline_passed is false even with distribution data', () => {
     render(
       <DistributionCard
-        homeTeam="Brasil"
-        awayTeam="Argentina"
+        {...baseProps}
         distribution={{ home_win: 50, draw: 30, away_win: 20, total_predictions: 10 }}
         isDeadlinePassed={false}
       />
@@ -350,8 +353,7 @@ describe('DistributionCard', () => {
   it('renders bar chart when is_deadline_passed is true and distribution is provided', () => {
     render(
       <DistributionCard
-        homeTeam="Brasil"
-        awayTeam="Argentina"
+        {...baseProps}
         distribution={{ home_win: 50, draw: 30, away_win: 20, total_predictions: 10 }}
         isDeadlinePassed={true}
       />
@@ -361,6 +363,71 @@ describe('DistributionCard', () => {
     expect(screen.getByTestId('distribution-chart')).toHaveTextContent('50%')
     expect(screen.getByTestId('distribution-chart')).toHaveTextContent('30%')
     expect(screen.getByTestId('distribution-chart')).toHaveTextContent('20%')
+  })
+
+  it('hides the "ver palpites dos jogadores" button while locked', () => {
+    render(<DistributionCard {...baseProps} distribution={null} isDeadlinePassed={false} />)
+    expect(screen.queryByTestId('open-player-predictions')).not.toBeInTheDocument()
+  })
+
+  it('opens the player-predictions modal listing picks and points once the deadline passed', async () => {
+    vi.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          data: {
+            is_deadline_passed: true,
+            is_finished: true,
+            home_team: 'Brasil',
+            away_team: 'Argentina',
+            home_score: 2,
+            away_score: 1,
+            players: [
+              {
+                user_id: 'u1',
+                full_name: 'Joao Rocha',
+                avatar_color: '#FFC72C',
+                predicted_home_score: 2,
+                predicted_away_score: 1,
+                points: 10,
+                is_exact: true,
+                is_current_user: true,
+              },
+              {
+                user_id: 'u2',
+                full_name: 'Maria Silva',
+                avatar_color: '#0097A9',
+                predicted_home_score: null,
+                predicted_away_score: null,
+                points: null,
+                is_exact: false,
+                is_current_user: false,
+              },
+            ],
+          },
+        }),
+    } as Response)
+
+    render(
+      <DistributionCard
+        {...baseProps}
+        distribution={{ home_win: 50, draw: 30, away_win: 20, total_predictions: 2 }}
+        isDeadlinePassed={true}
+      />
+    )
+
+    fireEvent.click(screen.getByTestId('open-player-predictions'))
+
+    await waitFor(() => expect(screen.getByTestId('player-predictions-modal')).toBeInTheDocument())
+
+    expect(screen.getByText('Joao Rocha')).toBeInTheDocument()
+    expect(screen.getByText('Maria Silva')).toBeInTheDocument()
+    expect(screen.getByText('Sem palpite')).toBeInTheDocument()
+    // Finished match → points badge with exact marker is shown.
+    expect(screen.getByText(/\+10/)).toBeInTheDocument()
+
+    fireEvent.click(screen.getByTestId('player-predictions-close'))
+    expect(screen.queryByTestId('player-predictions-modal')).not.toBeInTheDocument()
   })
 })
 
