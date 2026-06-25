@@ -140,6 +140,36 @@ describe('mapOpenfootballMatch — external_id & phase', () => {
     expect(row.phase).toBe('3rd_place')
   })
 
+  it('builds wc2026-104 for the Final when the feed carries a num', () => {
+    // The live 2026 feed numbers the Final (104); buildExternalId keys it by num
+    // and the bracket aliases wc2026-104 onto the final slot (regression).
+    const row = mapOpenfootballMatch(
+      makeMatch({
+        round: 'Final',
+        num: 104,
+        group: undefined,
+        team1: 'W101',
+        team2: 'W102',
+      })
+    )
+    expect(row.external_id).toBe('wc2026-104')
+    expect(row.phase).toBe('final')
+  })
+
+  it('builds wc2026-103 for the third-place match when the feed carries a num', () => {
+    const row = mapOpenfootballMatch(
+      makeMatch({
+        round: 'Match for third place',
+        num: 103,
+        group: undefined,
+        team1: 'L101',
+        team2: 'L102',
+      })
+    )
+    expect(row.external_id).toBe('wc2026-103')
+    expect(row.phase).toBe('3rd_place')
+  })
+
   it('builds a group external_id with PT names, phase=group, and the group letter', () => {
     const row = mapOpenfootballMatch(
       makeMatch({

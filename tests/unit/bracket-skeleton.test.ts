@@ -153,6 +153,14 @@ describe('slotForExternalId / slotForNum', () => {
     expect(slotForExternalId('wc2026-3rd')).toEqual({ phase: '3rd_place', pos: 1 })
   })
 
+  it('also resolves Final and 3rd-place via their numeric alias (wc2026-104 / wc2026-103)', () => {
+    // openfootball's 2026 feed numbers these two (Final = 104, 3rd place = 103),
+    // so a synced row keys them as wc2026-104 / wc2026-103 rather than the
+    // semantic id. The bracket must resolve both forms (regression: drift bug).
+    expect(slotForExternalId('wc2026-104')).toEqual({ phase: 'final', pos: 1 })
+    expect(slotForExternalId('wc2026-103')).toEqual({ phase: '3rd_place', pos: 1 })
+  })
+
   it('returns null for an unknown external_id', () => {
     expect(slotForExternalId('wc2026-A-Brasil-Argentina')).toBeNull()
     expect(slotForExternalId('nope')).toBeNull()

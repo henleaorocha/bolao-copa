@@ -7,8 +7,9 @@
 // split `date`/`time` with a local UTC offset, `ground` is a city (not a
 // stadium), there is no status enum or live concept, no numeric fixture id, and
 // `score` is absent until a match is played. The knockout topology is encoded
-// as a stable game `num` (73..102 on R32..SF) plus `W##`/`#A`/`L##`
-// placeholders; Final and third place carry no `num`.
+// as a stable game `num` (73..102 on R32..SF; the 2026 feed also numbers 3rd
+// place 103 and the Final 104, though older editions omit those two) plus
+// `W##`/`#A`/`L##` placeholders.
 
 import { ALL_COPA_TEAMS, VALID_TEAM_NAMES } from '@/lib/copa-teams'
 import { OPENFOOTBALL_TO_PT, toPtName } from '@/lib/team-names'
@@ -34,7 +35,7 @@ export type MatchPhase =
 // tests/fixtures/openfootball-wc2026.json).
 export interface OpenfootballMatch {
   round: string // "Matchday 1" | "Round of 32" | "Quarter-final" | "Final" | ...
-  num?: number // present on R32..SF (73..102); absent on Final & 3rd place
+  num?: number // 73..102 on R32..SF; the 2026 feed also numbers 3rd place (103) and the Final (104), though some editions omit those two
   date: string // "2026-07-04"
   time: string // "17:00 UTC-4"
   team1: string // EN name OR placeholder ("Mexico" | "2A" | "W74" | "L101")
@@ -149,10 +150,13 @@ function parsePhaseAndGroup(m: OpenfootballMatch): {
 }
 
 // Synthesize a stable external_id:
-//   knockout R32..SF → `wc2026-<num>`
-//   Final            → `wc2026-final`
-//   3rd place        → `wc2026-3rd`
-//   group            → `wc2026-<group>-<team1>-<team2>` (PT names, stable per draw)
+//   knockout with a num → `wc2026-<num>` (R32..SF = 73..102; the 2026 feed also
+//                          numbers 3rd place 103 and the Final 104)
+//   Final  without num  → `wc2026-final` (older feeds that omit the num)
+//   3rd    without num  → `wc2026-3rd`
+//   group               → `wc2026-<group>-<team1>-<team2>` (PT names, stable per draw)
+// The bracket resolves the Final/3rd slot by both forms (see SLOT_BY_EXTERNAL_ID
+// aliases in bracket-skeleton.ts), so a num on those two is non-breaking.
 function buildExternalId(
   m: OpenfootballMatch,
   phase: MatchPhase,

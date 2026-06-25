@@ -325,3 +325,58 @@ describe('buildBracketResponse — phase structure correctness', () => {
     }
   })
 })
+
+describe('buildBracketResponse — Final / 3rd-place via openfootball 2026 numeric ids', () => {
+  // Regression: the live 2026 feed numbers the Final (104) and 3rd place (103),
+  // so synced rows key them as wc2026-104 / wc2026-103 rather than the semantic
+  // wc2026-final / wc2026-3rd. The bracket must still fill those two slots.
+  it('fills the Final slot from a synced wc2026-104 row', () => {
+    const finalMatch = makeMatch({
+      id: 'match-final',
+      external_id: 'wc2026-104',
+      home_team: 'Brasil',
+      away_team: 'França',
+      home_flag: 'br',
+      away_flag: 'fr',
+      phase: 'final',
+      match_date: '2026-07-19T19:00:00Z',
+      status: 'finished',
+      home_score: 2,
+      away_score: 1,
+    })
+
+    const result = buildBracketResponse([finalMatch], [], NOW_OPEN)
+    const finalSlot = result.phases.find((p) => p.phase === 'final')!.slots[0]
+
+    expect(finalSlot.homeTeam).toBe('Brasil')
+    expect(finalSlot.awayTeam).toBe('França')
+    expect(finalSlot.state).toBe('finished')
+    expect(finalSlot.homeScore).toBe(2)
+    expect(finalSlot.awayScore).toBe(1)
+    expect(finalSlot.matchId).toBe('match-final')
+  })
+
+  it('fills the 3rd-place slot from a synced wc2026-103 row', () => {
+    const thirdMatch = makeMatch({
+      id: 'match-3rd',
+      external_id: 'wc2026-103',
+      home_team: 'Portugal',
+      away_team: 'Espanha',
+      home_flag: 'pt',
+      away_flag: 'es',
+      phase: '3rd_place',
+      match_date: '2026-07-18T19:00:00Z',
+      status: 'finished',
+      home_score: 3,
+      away_score: 0,
+    })
+
+    const result = buildBracketResponse([thirdMatch], [], NOW_OPEN)
+    const thirdSlot = result.phases.find((p) => p.phase === '3rd_place')!.slots[0]
+
+    expect(thirdSlot.homeTeam).toBe('Portugal')
+    expect(thirdSlot.awayTeam).toBe('Espanha')
+    expect(thirdSlot.state).toBe('finished')
+    expect(thirdSlot.matchId).toBe('match-3rd')
+  })
+})

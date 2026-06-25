@@ -148,6 +148,17 @@ const SLOT_BY_EXTERNAL_ID = new Map<string, { phase: KnockoutPhase; pos: number 
   BRACKET_SKELETON.map((slot) => [slot.externalId, { phase: slot.phase, pos: slot.pos }])
 )
 
+// Numeric aliases for the Final and 3rd-place slots. openfootball's `num`
+// coverage for these two is not stable across editions: the 2022 file omits
+// knockout nums entirely, while the 2026 file numbers them (3rd place = 103,
+// Final = 104). So a synced row carries `wc2026-103` / `wc2026-104` when the
+// feed has a num (the current 2026 case — prod already stores these) or the
+// canonical `wc2026-3rd` / `wc2026-final` when it does not. Alias the numeric
+// ids onto the same two slots so the bracket resolves either form, independent
+// of upstream consistency. (Real games 73..102 never collide with 103/104.)
+SLOT_BY_EXTERNAL_ID.set('wc2026-103', { phase: '3rd_place', pos: 1 })
+SLOT_BY_EXTERNAL_ID.set('wc2026-104', { phase: 'final', pos: 1 })
+
 const SLOT_BY_NUM = new Map<number, { phase: KnockoutPhase; pos: number }>(
   BRACKET_SKELETON.filter((slot) => slot.num != null).map((slot) => [
     slot.num as number,
