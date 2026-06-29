@@ -42,7 +42,7 @@ export interface OpenfootballMatch {
   team2: string
   group?: string // "Group A" (group matches only)
   ground: string // city, e.g. "Los Angeles (Inglewood)"
-  score?: { ft?: [number, number] } // absent until played
+  score?: { ft?: [number, number]; et?: [number, number] } // et present only if extra time was played
 }
 
 // Internal row shape consumed by the sync route (one `matches` table row).
@@ -173,22 +173,21 @@ function buildExternalId(
   return `wc2026-${m.round}-${homeTeam}-${awayTeam}`
 }
 
-// Derive status and scores from the optional `score` object. `score.ft` present
-// (a 2-number tuple) → finished with those scores; everything else (absent or
-// unknown shape) falls back to scheduled with null scores.
+// Derive status and scores from the optional `score` object.
+// Prefers `score.et` (tempo normal + prorrogação) over `score.ft` when extra
+// time was played — penalties are excluded per bolão rules. Falls back to
+// scheduled with null scores when no valid score tuple is present.
 function deriveResult(score: OpenfootballMatch['score']): {
   status: MatchRow['status']
   home_score: number | null
   away_score: number | null
 } {
-  const ft = score?.ft
-  if (
-    Array.isArray(ft) &&
-    ft.length === 2 &&
-    typeof ft[0] === 'number' &&
-    typeof ft[1] === 'number'
-  ) {
-    return { status: 'finished', home_score: ft[0], away_score: ft[1] }
+  const isValidTuple = (t: unknown): t is [number, number] =>
+    Array.isArray(t) && t.length === 2 && typeof t[0] === 'number' && typeof t[1] === 'number'
+
+  const effective = isValidTuple(score?.et) ? score!.et : score?.ft
+  if (isValidTuple(effective)) {
+    return { status: 'finished', home_score: effective[0], away_score: effective[1] }
   }
   return { status: 'scheduled', home_score: null, away_score: null }
 }

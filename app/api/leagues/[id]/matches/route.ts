@@ -66,6 +66,8 @@ export async function GET(
 
     if (phaseParam === 'group') {
       matchesQuery = matchesQuery.eq('phase', 'group')
+    } else if (phaseParam === 'knockout') {
+      matchesQuery = matchesQuery.neq('phase', 'group')
     }
 
     if (groupParam) {

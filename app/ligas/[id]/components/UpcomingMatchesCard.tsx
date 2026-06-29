@@ -95,7 +95,7 @@ export default function UpcomingMatchesCard({ leagueId }: UpcomingMatchesCardPro
           </div>
         </div>
         <Link
-          href={`/ligas/${leagueId}/palpites`}
+          href={`/ligas/${leagueId}/mata-mata`}
           className="text-xs font-bold text-[#0097A9] hover:underline shrink-0"
         >
           Ver Todos

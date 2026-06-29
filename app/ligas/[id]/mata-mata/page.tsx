@@ -6,7 +6,6 @@ import { Save } from 'lucide-react'
 import type { BracketResponse } from '@/lib/bracket'
 import type { KnockoutPhase } from '@/lib/bracket-skeleton'
 import { useLeaguePanel } from '../league-panel-context'
-import StatusBanner from './components/StatusBanner'
 import UnlockBanner from './components/UnlockBanner'
 import PhaseSelector from './components/PhaseSelector'
 import MatchCard from './components/MatchCard'
@@ -178,61 +177,64 @@ export default function MataMataPage() {
   }
 
   return (
-    <div className="px-4 lg:px-8 py-6">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-4 mb-6">
-        <div>
-          <p
-            className="text-[11px] font-black uppercase tracking-widest text-slate-400 mb-1"
-            data-testid="header-label"
+    <div className="flex flex-col h-full">
+      {/* Sticky top: header + banner + phase selector */}
+      <div className="shrink-0 px-4 lg:px-8 pt-6 pb-4">
+        {/* Header */}
+        <div className="flex items-start justify-between gap-4 mb-6">
+          <div>
+            <p
+              className="text-[11px] font-black uppercase tracking-widest text-slate-400 mb-1"
+              data-testid="header-label"
+            >
+              ELIMINATÓRIAS · 6 FASES
+            </p>
+            <h1 className="text-2xl font-black text-slate-900" data-testid="header-title">
+              Chaveamento
+            </h1>
+            <p className="text-sm text-slate-500 mt-1" data-testid="header-subtitle">
+              A partir das eliminatórias, cada palpite vale mais pontos
+            </p>
+          </div>
+          <button
+            onClick={handleSaveAll}
+            disabled={!hasUnsaved || saving}
+            className="shrink-0 mt-2 flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-black text-[#244C5A] bg-[#FFC72C] disabled:bg-slate-200 disabled:text-slate-400 transition-colors shadow-sm"
+            data-testid="save-all-btn"
           >
-            ELIMINATÓRIAS · 6 FASES
-          </p>
-          <h1 className="text-2xl font-black text-slate-900" data-testid="header-title">
-            Chaveamento
-          </h1>
-          <p className="text-sm text-slate-500 mt-1" data-testid="header-subtitle">
-            A partir das eliminatórias, cada palpite vale mais pontos
-          </p>
+            <Save size={15} />
+            {saving ? 'Salvando...' : 'Salvar todos'}
+          </button>
         </div>
-        <button
-          onClick={handleSaveAll}
-          disabled={!hasUnsaved || saving}
-          className="shrink-0 mt-2 flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-black text-[#244C5A] bg-[#FFC72C] disabled:bg-slate-200 disabled:text-slate-400 transition-colors shadow-sm"
-          data-testid="save-all-btn"
-        >
-          <Save size={15} />
-          {saving ? 'Salvando...' : 'Salvar todos'}
-        </button>
+
+        {/* Phase-unlock banner (self-clears when newlyUnlockedPhase is null) */}
+        <UnlockBanner newlyUnlockedPhase={bracket.newlyUnlockedPhase} />
+
+        {/* Phase selector */}
+        <PhaseSelector
+          phases={bracket.phases}
+          selectedPhase={selectedPhase}
+          onPhaseChange={setSelectedPhase}
+        />
       </div>
 
-      {/* Pre-launch status banner */}
-      <StatusBanner />
-
-      {/* Phase-unlock banner (self-clears when newlyUnlockedPhase is null) */}
-      <UnlockBanner newlyUnlockedPhase={bracket.newlyUnlockedPhase} />
-
-      {/* Phase selector */}
-      <PhaseSelector
-        phases={bracket.phases}
-        selectedPhase={selectedPhase}
-        onPhaseChange={setSelectedPhase}
-      />
-
-      {/* Match cards */}
-      {currentPhase && (
-        <div className="space-y-3" data-testid="match-list">
-          {currentPhase.slots.map((slot) => (
-            <MatchCard
-              key={slot.pos}
-              slot={slot}
-              homeInput={slot.matchId ? (inputValues[slot.matchId]?.home ?? '') : ''}
-              awayInput={slot.matchId ? (inputValues[slot.matchId]?.away ?? '') : ''}
-              onInputChange={handleInputChange}
-            />
-          ))}
-        </div>
-      )}
+      {/* Scrollable match cards */}
+      <div className="flex-1 overflow-y-auto px-4 lg:px-8 pb-28 lg:pb-6">
+        {currentPhase && (
+          <div className="space-y-3" data-testid="match-list">
+            {currentPhase.slots.map((slot) => (
+              <MatchCard
+                key={slot.pos}
+                slot={slot}
+                leagueId={leagueId}
+                homeInput={slot.matchId ? (inputValues[slot.matchId]?.home ?? '') : ''}
+                awayInput={slot.matchId ? (inputValues[slot.matchId]?.away ?? '') : ''}
+                onInputChange={handleInputChange}
+              />
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

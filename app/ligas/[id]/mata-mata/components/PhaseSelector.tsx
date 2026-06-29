@@ -4,7 +4,7 @@ import type { KnockoutPhase } from '@/lib/bracket-skeleton'
 import type { BracketPhaseView } from '@/lib/bracket'
 
 const CHIP_LABELS: Record<KnockoutPhase, string> = {
-  '32nd': '32 avos',
+  '32nd': '16 avos',
   '16th': 'Oitavas',
   '8th': 'Quartas',
   semi: 'Semifinal',

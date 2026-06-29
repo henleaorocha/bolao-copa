@@ -15,7 +15,7 @@ const SCORING_ROWS = [
   { icon: '🏆', name: 'Palpite de Vice-Campeão', subtitle: 'Acertar quem perde a final', points: '+25' },
   { icon: '🎯', name: 'Placar Exato (Grupos)', subtitle: '2x1 = 2x1', points: '+10' },
   { icon: '✓', name: 'Vencedor/Empate (Grupos)', subtitle: 'Sem cravar o placar', points: '+5' },
-  { icon: '↗', name: 'Multiplicador 32 avos', subtitle: 'Sobre pontos da partida', points: '1.5x' },
+  { icon: '↗', name: 'Multiplicador 16 avos', subtitle: 'Sobre pontos da partida', points: '1.5x' },
 ]
 
 const STEP_LABELS: Record<1 | 2 | 3 | 4, string> = {

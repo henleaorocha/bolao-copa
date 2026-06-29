@@ -51,7 +51,7 @@ function Shell({ children }: { children: ReactNode }) {
         />
       </div>
 
-      <div className="flex-1 min-w-0 flex flex-col min-h-screen lg:min-h-0 lg:h-screen">
+      <div className="flex-1 min-w-0 flex flex-col h-screen">
         <div className="lg:hidden">
           <PainelTopBar
             leagueName={league.name}

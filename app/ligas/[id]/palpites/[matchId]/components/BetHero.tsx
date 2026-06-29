@@ -49,7 +49,7 @@ function formatMatchDateTime(matchDate: string): string {
 function phaseLabelPT(phase: MatchDetail['phase']): string {
   const labels: Record<string, string> = {
     group: 'Fase de grupos',
-    '32nd': 'Oitavas (32)',
+    '32nd': '16 avos de final',
     '16th': 'Oitavas de final',
     '8th': 'Quartas de final',
     '4th': 'Semifinal',

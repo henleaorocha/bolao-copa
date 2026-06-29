@@ -130,7 +130,7 @@ describe('MatchCard — placeholder state', () => {
       awayLabel: 'Vencedor 2º Grupo B',
     })
     render(
-      <MatchCard
+      <MatchCard leagueId="test-league"
         slot={slot}
         homeInput=""
         awayInput=""
@@ -144,7 +144,7 @@ describe('MatchCard — placeholder state', () => {
   it('shows A DEFINIR badge for placeholder state', async () => {
     const MatchCard = await importMatchCard()
     render(
-      <MatchCard
+      <MatchCard leagueId="test-league"
         slot={makeSlot({ state: 'placeholder' })}
         homeInput=""
         awayInput=""
@@ -158,7 +158,7 @@ describe('MatchCard — placeholder state', () => {
     const MatchCard = await importMatchCard()
     const slot = makeSlot({ state: 'placeholder', matchId: null })
     render(
-      <MatchCard
+      <MatchCard leagueId="test-league"
         slot={slot}
         homeInput=""
         awayInput=""
@@ -185,7 +185,7 @@ describe('MatchCard — open state', () => {
       kickoff: '2026-06-28T21:00:00Z',
     })
     render(
-      <MatchCard
+      <MatchCard leagueId="test-league"
         slot={slot}
         homeInput=""
         awayInput=""
@@ -199,7 +199,7 @@ describe('MatchCard — open state', () => {
   it('shows ABERTO badge', async () => {
     const MatchCard = await importMatchCard()
     render(
-      <MatchCard
+      <MatchCard leagueId="test-league"
         slot={makeSlot({ state: 'open', matchId: 'match-1', homeTeam: 'Brasil', awayTeam: 'Argentina' })}
         homeInput=""
         awayInput=""
@@ -218,7 +218,7 @@ describe('MatchCard — open state', () => {
       awayTeam: 'Argentina',
     })
     render(
-      <MatchCard
+      <MatchCard leagueId="test-league"
         slot={slot}
         homeInput="2"
         awayInput="1"
@@ -239,7 +239,7 @@ describe('MatchCard — open state', () => {
     const MatchCard = await importMatchCard()
     const onInputChange = vi.fn()
     render(
-      <MatchCard
+      <MatchCard leagueId="test-league"
         slot={makeSlot({ state: 'open', matchId: 'match-1', homeTeam: 'Brasil', awayTeam: 'Argentina' })}
         homeInput=""
         awayInput=""
@@ -254,7 +254,7 @@ describe('MatchCard — open state', () => {
     const MatchCard = await importMatchCard()
     const onInputChange = vi.fn()
     render(
-      <MatchCard
+      <MatchCard leagueId="test-league"
         slot={makeSlot({ state: 'open', matchId: 'match-1', homeTeam: 'Brasil', awayTeam: 'Argentina' })}
         homeInput=""
         awayInput=""
@@ -272,7 +272,7 @@ describe('MatchCard — PALPITADO state (open + saved prediction)', () => {
   it('shows the ✓ PALPITADO badge when an open slot already has a prediction', async () => {
     const MatchCard = await importMatchCard()
     render(
-      <MatchCard
+      <MatchCard leagueId="test-league"
         slot={makeSlot({
           state: 'open',
           matchId: 'match-1',
@@ -296,7 +296,7 @@ describe('MatchCard — PALPITADO state (open + saved prediction)', () => {
     const MatchCard = await importMatchCard()
     const onInputChange = vi.fn()
     render(
-      <MatchCard
+      <MatchCard leagueId="test-league"
         slot={makeSlot({
           state: 'open',
           matchId: 'match-1',
@@ -323,7 +323,7 @@ describe('MatchCard — PALPITADO state (open + saved prediction)', () => {
   it('shows ABERTO (not PALPITADO) when an open slot has no prediction', async () => {
     const MatchCard = await importMatchCard()
     render(
-      <MatchCard
+      <MatchCard leagueId="test-league"
         slot={makeSlot({
           state: 'open',
           matchId: 'match-1',
@@ -347,7 +347,7 @@ describe('MatchCard — placeholder team rows', () => {
   it('renders placeholder labels with italic styling', async () => {
     const MatchCard = await importMatchCard()
     render(
-      <MatchCard
+      <MatchCard leagueId="test-league"
         slot={makeSlot({
           state: 'placeholder',
           homeLabel: 'Vencedor 1º Grupo A',
@@ -369,7 +369,7 @@ describe('MatchCard — locked state', () => {
   it('renders real teams but no prediction inputs', async () => {
     const MatchCard = await importMatchCard()
     render(
-      <MatchCard
+      <MatchCard leagueId="test-league"
         slot={makeSlot({
           state: 'locked',
           matchId: 'match-1',
@@ -393,7 +393,7 @@ describe('MatchCard — locked state', () => {
   it('shows saved prediction read-only when locked and prediction exists', async () => {
     const MatchCard = await importMatchCard()
     render(
-      <MatchCard
+      <MatchCard leagueId="test-league"
         slot={makeSlot({
           state: 'locked',
           matchId: 'match-1',
@@ -417,7 +417,7 @@ describe('MatchCard — finished state', () => {
   it('shows ENCERRADO badge and final scores', async () => {
     const MatchCard = await importMatchCard()
     render(
-      <MatchCard
+      <MatchCard leagueId="test-league"
         slot={makeSlot({
           state: 'finished',
           matchId: 'match-1',
@@ -441,7 +441,7 @@ describe('MatchCard — finished state', () => {
   it('shows no prediction inputs for finished matches', async () => {
     const MatchCard = await importMatchCard()
     render(
-      <MatchCard
+      <MatchCard leagueId="test-league"
         slot={makeSlot({
           state: 'finished',
           matchId: 'match-1',
@@ -461,7 +461,7 @@ describe('MatchCard — finished state', () => {
   it('shows user prediction alongside final score when available', async () => {
     const MatchCard = await importMatchCard()
     render(
-      <MatchCard
+      <MatchCard leagueId="test-league"
         slot={makeSlot({
           state: 'finished',
           matchId: 'match-1',

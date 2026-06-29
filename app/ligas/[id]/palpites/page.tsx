@@ -1,11 +1,11 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import type { MatchWithPrediction } from '@/lib/api/types'
 import PalpitesFilters, { type DateFilter } from './components/PalpitesFilters'
 import MatchRow from './components/MatchRow'
-import { Save } from 'lucide-react'
+import { Save, Trophy, ArrowRight } from 'lucide-react'
 
 interface InputValues {
   [matchId: string]: { home: string; away: string }
@@ -45,6 +45,7 @@ function isUnsaved(
 
 export default function PalpitesPage() {
   const params = useParams()
+  const router = useRouter()
   const leagueId = params.id as string
 
   const [allMatches, setAllMatches] = useState<MatchWithPrediction[]>([])
@@ -54,6 +55,7 @@ export default function PalpitesPage() {
   const [activeGroup, setActiveGroup] = useState<string>('all')
   const [inputValues, setInputValues] = useState<InputValues>({})
   const [saving, setSaving] = useState(false)
+  const [isKnockoutStarted, setIsKnockoutStarted] = useState(false)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -84,6 +86,15 @@ export default function PalpitesPage() {
       })
 
     return () => controller.abort()
+  }, [leagueId])
+
+  useEffect(() => {
+    fetch(`/api/leagues/${leagueId}/matches?phase=knockout`)
+      .then((res) => res.ok ? res.json() : null)
+      .then((body) => {
+        if (body?.data?.matches?.length > 0) setIsKnockoutStarted(true)
+      })
+      .catch(() => {})
   }, [leagueId])
 
   const todayStr = useMemo(() => getLocalDateStr(new Date()), [])
@@ -219,6 +230,28 @@ export default function PalpitesPage() {
           {saving ? 'Salvando...' : 'Salvar todos'}
         </button>
       </div>
+
+      {/* Knockout banner */}
+      {isKnockoutStarted && (
+        <div className="mb-6 rounded-xl bg-[#244C5A] px-4 py-4 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <Trophy size={20} className="shrink-0 text-[#FFC72C]" />
+            <div className="min-w-0">
+              <p className="text-sm font-black text-white leading-snug">Mata-mata em andamento!</p>
+              <p className="text-xs text-slate-300 mt-0.5 leading-snug">
+                Faça seus palpites no menu exclusivo do mata-mata.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => router.push(`/ligas/${leagueId}/mata-mata`)}
+            className="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#FFC72C] text-[#244C5A] text-xs font-black whitespace-nowrap"
+          >
+            Ver mata-mata
+            <ArrowRight size={13} />
+          </button>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="mb-6">
