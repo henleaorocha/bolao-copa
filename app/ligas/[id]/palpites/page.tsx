@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import type { MatchWithPrediction } from '@/lib/api/types'
-import PalpitesFilters, { type DateFilter } from './components/PalpitesFilters'
+import PalpitesFilters from './components/PalpitesFilters'
 import MatchRow from './components/MatchRow'
 import { Save, Trophy, ArrowRight } from 'lucide-react'
 
@@ -51,7 +51,6 @@ export default function PalpitesPage() {
   const [allMatches, setAllMatches] = useState<MatchWithPrediction[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [activeDate, setActiveDate] = useState<DateFilter>('today')
   const [activeGroup, setActiveGroup] = useState<string>('all')
   const [inputValues, setInputValues] = useState<InputValues>({})
   const [saving, setSaving] = useState(false)
@@ -97,27 +96,9 @@ export default function PalpitesPage() {
       .catch(() => {})
   }, [leagueId])
 
-  const todayStr = useMemo(() => getLocalDateStr(new Date()), [])
-  const tomorrowStr = useMemo(() => getLocalDateStr(new Date(Date.now() + 86400000)), [])
-
-  const dateCounts = useMemo(
-    () => ({
-      all: allMatches.length,
-      today: allMatches.filter((m) => getLocalDateStr(new Date(m.match_date)) === todayStr).length,
-      tomorrow: allMatches.filter((m) => getLocalDateStr(new Date(m.match_date)) === tomorrowStr).length,
-    }),
-    [allMatches, todayStr, tomorrowStr]
-  )
-
   const filteredMatches = useMemo(
-    () =>
-      allMatches.filter((m) => {
-        if (activeDate === 'today' && getLocalDateStr(new Date(m.match_date)) !== todayStr) return false
-        if (activeDate === 'tomorrow' && getLocalDateStr(new Date(m.match_date)) !== tomorrowStr) return false
-        if (activeGroup !== 'all' && m.group !== activeGroup) return false
-        return true
-      }),
-    [allMatches, activeDate, activeGroup, todayStr, tomorrowStr]
+    () => allMatches.filter((m) => activeGroup === 'all' || m.group === activeGroup),
+    [allMatches, activeGroup]
   )
 
   const groupedByDate = useMemo(() => {
@@ -256,11 +237,8 @@ export default function PalpitesPage() {
       {/* Filters */}
       <div className="mb-6">
         <PalpitesFilters
-          activeDate={activeDate}
-          onDateChange={setActiveDate}
           activeGroup={activeGroup}
           onGroupChange={setActiveGroup}
-          dateCounts={dateCounts}
         />
       </div>
 
