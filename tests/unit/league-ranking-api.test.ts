@@ -5,29 +5,53 @@ vi.mock('@/lib/supabase/client', () => ({
   getSupabaseServerClient: vi.fn(),
 }))
 
-// The route reads champion_bets with a service-role client (createClient from
-// @supabase/supabase-js) to bypass the per-row owner RLS filter. Mock it to
-// serve whatever champBetsResult the current makeSupabase() was configured with,
-// shared via vi.hoisted so the mock factory can reach it despite hoisting.
-const { champBetsState } = vi.hoisted(() => ({
-  champBetsState: { current: { data: [] as unknown, error: null as unknown } },
+// O cálculo pesado roda em getCachedLeagueRanking, embrulhado em unstable_cache.
+// Nos testes ele deve recomputar a cada chamada (sem cache vazando entre casos);
+// revalidateTag é no-op.
+vi.mock('next/cache', () => ({
+  unstable_cache: (fn: (...args: unknown[]) => unknown) => fn,
+  revalidateTag: vi.fn(),
 }))
 
-vi.mock('@supabase/supabase-js', () => ({
-  createClient: () => ({
-    from: (table: string) => {
-      if (table === 'champion_bets') {
-        const promise = Promise.resolve(champBetsState.current)
-        const thenable = {
-          then: promise.then.bind(promise),
-          catch: promise.catch.bind(promise),
-        }
-        return { select: () => ({ eq: () => thenable }) }
-      }
-      return {}
-    },
-  }),
+// getCachedLeagueRanking lê members/champion_bets/predictions/matches com um
+// client service-role (createClient de @supabase/supabase-js). Servimos esses
+// dados via estado hoisted, alcançável pela factory do mock apesar do hoisting.
+const { serviceState } = vi.hoisted(() => ({
+  serviceState: {
+    membersResult: { data: [] as unknown, error: null as unknown },
+    champBetsResult: { data: [] as unknown, error: null as unknown },
+    predictionsResult: { data: [] as unknown, error: null as unknown },
+    finishedMatchesResult: { data: [] as unknown, error: null as unknown },
+  },
 }))
+
+vi.mock('@supabase/supabase-js', () => {
+  const thenableOf = (result: unknown) => {
+    const p = Promise.resolve(result)
+    return { then: p.then.bind(p), catch: p.catch.bind(p) }
+  }
+  return {
+    createClient: () => ({
+      from: (table: string) => {
+        if (table === 'league_members') {
+          // members list: .select(...).eq(league_id).order(joined_at)
+          return { select: () => ({ eq: () => ({ order: () => thenableOf(serviceState.membersResult) }) }) }
+        }
+        if (table === 'champion_bets') {
+          return { select: () => ({ eq: () => thenableOf(serviceState.champBetsResult) }) }
+        }
+        if (table === 'predictions') {
+          // paginado: .select().eq(league_id).order('id').range(from, to)
+          return { select: () => ({ eq: () => ({ order: () => ({ range: () => thenableOf(serviceState.predictionsResult) }) }) }) }
+        }
+        if (table === 'matches') {
+          return { select: () => ({ eq: () => thenableOf(serviceState.finishedMatchesResult) }) }
+        }
+        return {}
+      },
+    }),
+  }
+})
 
 import { GET } from '@/app/api/leagues/[id]/ranking/route'
 import { getSupabaseServerClient } from '@/lib/supabase/client'
@@ -75,11 +99,6 @@ function makeParams(): { params: Promise<{ id: string }> } {
   return { params: Promise.resolve({ id: 'league-abc' }) }
 }
 
-function makeThenable<T>(result: { data: T; error: unknown }) {
-  const promise = Promise.resolve(result)
-  return { then: promise.then.bind(promise), catch: promise.catch.bind(promise) }
-}
-
 function makeSupabase(overrides?: {
   user?: unknown
   authError?: unknown
@@ -102,12 +121,14 @@ function makeSupabase(overrides?: {
     ...overrides,
   }
 
-  // Champion bets are read via the service-role client (mocked above), so expose
-  // this instance's champBetsResult to that mock.
-  champBetsState.current = opts.champBetsResult
+  // Dados lidos pelo helper service-role (mock de @supabase/supabase-js).
+  serviceState.membersResult = opts.membersResult
+  serviceState.champBetsResult = opts.champBetsResult
+  serviceState.predictionsResult = opts.predictionsResult
+  serviceState.finishedMatchesResult = opts.finishedMatchesResult
 
-  let leagueMembersCallCount = 0
-
+  // O client de sessão (getSupabaseServerClient) só faz auth + leagues +
+  // checagem de pertencimento; o resto migrou para o helper cacheado.
   const from = vi.fn((table: string) => {
     if (table === 'leagues') {
       const single = vi.fn().mockResolvedValue(opts.leagueResult)
@@ -117,44 +138,11 @@ function makeSupabase(overrides?: {
     }
 
     if (table === 'league_members') {
-      leagueMembersCallCount++
-      if (leagueMembersCallCount === 1) {
-        // membership check: .select('role').eq(user_id).eq(league_id).single()
-        const single = vi.fn().mockResolvedValue(opts.membershipResult)
-        const eq2 = vi.fn(() => ({ single }))
-        const eq1 = vi.fn(() => ({ eq: eq2 }))
-        const select = vi.fn(() => ({ eq: eq1 }))
-        return { select }
-      } else {
-        // members list: .select(...).eq(league_id).order(...)
-        const order = vi.fn().mockResolvedValue(opts.membersResult)
-        const eq = vi.fn(() => ({ order }))
-        const select = vi.fn(() => ({ eq }))
-        return { select }
-      }
-    }
-
-    if (table === 'champion_bets') {
-      const thenable = makeThenable(opts.champBetsResult)
-      const eq = vi.fn(() => thenable)
-      const select = vi.fn(() => ({ eq }))
-      return { select }
-    }
-
-    if (table === 'predictions') {
-      // Paginated read: .select().eq(league_id).order('id').range(from, to).
-      // Test fixtures are all < 1000 rows, so the helper reads a single page.
-      const range = vi.fn(() => makeThenable(opts.predictionsResult))
-      const order = vi.fn(() => ({ range }))
-      const eq = vi.fn(() => ({ order }))
-      const select = vi.fn(() => ({ eq }))
-      return { select }
-    }
-
-    if (table === 'matches') {
-      const thenable = makeThenable(opts.finishedMatchesResult)
-      const eq = vi.fn(() => thenable)
-      const select = vi.fn(() => ({ eq }))
+      // membership check: .select('role').eq(user_id).eq(league_id).single()
+      const single = vi.fn().mockResolvedValue(opts.membershipResult)
+      const eq2 = vi.fn(() => ({ single }))
+      const eq1 = vi.fn(() => ({ eq: eq2 }))
+      const select = vi.fn(() => ({ eq: eq1 }))
       return { select }
     }
 

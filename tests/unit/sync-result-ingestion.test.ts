@@ -17,6 +17,7 @@ vi.mock('@supabase/supabase-js', () => ({
 
 vi.mock('next/cache', () => ({
   revalidateTag: vi.fn(),
+  unstable_cache: (fn: (...args: unknown[]) => unknown) => fn,
 }))
 
 import { fetchWorldCupFixtures } from '@/lib/football-api'

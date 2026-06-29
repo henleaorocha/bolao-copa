@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { revalidateTag } from 'next/cache'
 import { getSupabaseServerClient } from '@/lib/supabase/client'
 import { requireOperator } from '@/lib/operator'
+import { RANKINGS_CACHE_TAG } from '@/lib/leagues/get-league-ranking'
 import { formatSuccess, formatError } from '@/lib/api/responses'
 
 // Same defensive cap as the predictions route — no real match approaches it, and
@@ -145,6 +147,10 @@ export async function PATCH(
         { status: 500 }
       )
     }
+
+    // Resultado mudou (set ou release) → o ranking de TODAS as ligas pode mudar.
+    // Invalida o cache imediatamente, sem esperar o sync horário nem o backstop.
+    revalidateTag(RANKINGS_CACHE_TAG, { expire: 0 })
 
     const duration = Date.now() - start
     console.log(

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { revalidateTag } from 'next/cache'
 import { fetchWorldCupFixtures, mapOpenfootballMatch } from '@/lib/football-api'
+import { RANKINGS_CACHE_TAG } from '@/lib/leagues/get-league-ranking'
 import { formatSuccess, formatError } from '@/lib/api/responses'
 
 export async function POST(request: NextRequest) {
@@ -91,6 +92,8 @@ export async function POST(request: NextRequest) {
     )
 
     revalidateTag('fixtures', { expire: 0 })
+    // Resultados ingeridos podem ter finalizado partidas → invalida os rankings.
+    revalidateTag(RANKINGS_CACHE_TAG, { expire: 0 })
 
     const duration = Date.now() - start
     console.log(

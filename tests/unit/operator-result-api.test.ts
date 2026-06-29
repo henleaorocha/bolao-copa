@@ -13,6 +13,14 @@ vi.mock('@supabase/supabase-js', () => ({
   createClient: vi.fn(),
 }))
 
+// O handler invalida o cache de ranking ao salvar um resultado; fora de um
+// request scope do Next, revalidateTag real lançaria. unstable_cache é
+// pass-through (o helper de ranking o chama no load do módulo).
+vi.mock('next/cache', () => ({
+  revalidateTag: vi.fn(),
+  unstable_cache: (fn: (...args: unknown[]) => unknown) => fn,
+}))
+
 import { PATCH } from '@/app/api/admin/matches/[id]/result/route'
 import { requireOperator } from '@/lib/operator'
 import { getSupabaseServerClient } from '@/lib/supabase/client'

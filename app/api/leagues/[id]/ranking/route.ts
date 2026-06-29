@@ -1,24 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
 import { getSupabaseServerClient } from '@/lib/supabase/client'
 import { formatSuccess, formatError } from '@/lib/api/responses'
-import { computeRanking } from '@/lib/ranking'
-import { fetchAllLeaguePredictions } from '@/lib/predictions'
+import { getCachedLeagueRanking } from '@/lib/leagues/get-league-ranking'
 import { BET_DEADLINE } from '@/lib/copa-teams'
 import type { RankingFullEntry } from '@/lib/api/types'
-
-interface UserEmbed {
-  full_name: string | null
-  avatar_color: string
-}
-
-interface MemberRow {
-  user_id: string
-  joined_at: string
-  // PostgREST returns the to-one users join as an object; older generated
-  // types model it as an array — accept both so full_name always resolves.
-  users: UserEmbed | UserEmbed[] | null
-}
 
 export async function GET(
   request: NextRequest,
@@ -80,111 +65,24 @@ export async function GET(
       )
     }
 
-    const membersResult = await supabase
-      .from('league_members')
-      .select(
-        `
-        user_id,
-        joined_at,
-        users (
-          full_name,
-          avatar_color
-        )
-      `
-      )
-      .eq('league_id', leagueId)
-      .order('joined_at', { ascending: true })
-
-    if (membersResult.error) {
-      console.error(
-        JSON.stringify({
-          timestamp: new Date().toISOString(),
-          level: 'error',
-          endpoint: '/api/leagues/[id]/ranking',
-          method: 'GET',
-          user_id: user.id,
-          league_id: leagueId,
-          error: membersResult.error.message,
-        })
-      )
-      return NextResponse.json(
-        formatError('DATABASE_ERROR', 'Erro ao buscar membros da liga', 500),
-        { status: 500 }
-      )
-    }
-
-    // Read every member's champion/runner-up pick with a service-role client to
-    // bypass the per-row owner filter in RLS (champion_bets_select_league_peers
-    // only reveals peers' bets after the final is finished). The membership
-    // guard above already proved the caller belongs to this league, and the
-    // reveal is gated in app code by BET_DEADLINE below — so we read all picks
-    // here and decide visibility centrally.
-    const adminSupabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
-
-    const { data: allChampBets } = await adminSupabase
-      .from('champion_bets')
-      .select('user_id, champion_team, runner_up_team')
-      .eq('league_id', leagueId)
-
-    const { data: allPredictions, error: predictionsError } =
-      await fetchAllLeaguePredictions(supabase, leagueId)
-
-    if (predictionsError) {
-      console.error(
-        JSON.stringify({
-          timestamp: new Date().toISOString(),
-          level: 'error',
-          endpoint: '/api/leagues/[id]/ranking',
-          method: 'GET',
-          user_id: user.id,
-          league_id: leagueId,
-          error: predictionsError.message,
-        })
-      )
-      return NextResponse.json(
-        formatError('DATABASE_ERROR', 'Erro ao buscar palpites da liga', 500),
-        { status: 500 }
-      )
-    }
-
-    const { data: finishedMatches } = await supabase
-      .from('matches')
-      .select('id, phase, home_team, away_team, home_score, away_score, match_date')
-      .eq('status', 'finished')
-
-    const members = (membersResult.data as MemberRow[]).map((row) => {
-      const u = Array.isArray(row.users) ? row.users[0] : row.users
-      return {
-        user_id: row.user_id,
-        full_name: u?.full_name ?? null,
-        avatar_color: u?.avatar_color ?? '',
-        joined_at: row.joined_at,
-      }
-    })
-
-    const ranking: RankingFullEntry[] = computeRanking({
-      members,
-      predictions: allPredictions,
-      finishedMatches: (finishedMatches ?? []) as Parameters<typeof computeRanking>[0]['finishedMatches'],
-      championBets: (allChampBets ?? []).map((b) => ({
-        user_id: b.user_id,
-        champion_team: b.champion_team,
-        runner_up_team: b.runner_up_team,
-      })),
-    })
+    // Cálculo pesado (todos os palpites + membros + partidas + computeRanking)
+    // memoizado por liga e compartilhado por todos os membros. Invalidado por tag
+    // em eventos de resultado (sync, lançamento manual) e em novas entradas.
+    // Inclui os campos de campeão/vice; a visibilidade é decidida abaixo.
+    const fullRanking = await getCachedLeagueRanking(leagueId)
 
     // Champion/runner-up picks are private until betting closes, so members
     // can't copy each other's votes. Strip them from the payload entirely
     // before the deadline; afterwards every member's picks are public.
-    if (Date.now() < BET_DEADLINE.getTime()) {
-      for (const entry of ranking) {
-        entry.champion_team = null
-        entry.runner_up_team = null
-      }
-    }
+    // Não mutamos os objetos do cache: geramos cópias por request.
+    const ranking: RankingFullEntry[] =
+      Date.now() < BET_DEADLINE.getTime()
+        ? fullRanking.map((entry) => ({
+            ...entry,
+            champion_team: null,
+            runner_up_team: null,
+          }))
+        : fullRanking
 
     const duration = Date.now() - start
     console.log(

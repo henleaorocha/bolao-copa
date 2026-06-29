@@ -1,102 +1,63 @@
-import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-// Páginas acessíveis sem autenticação
+// Páginas acessíveis sem autenticação.
 // /regras.html é estático (public/) e não-sensível: liberado para abrir no app
 // e ser compartilhado por link (ex: WhatsApp) sem exigir login.
-const PAGINAS_PUBLICAS  = ['/', '/login', '/auth/callback', '/regras.html']
-// Rotas de API acessíveis sem autenticação de sessão.
-// /api/admin/sync-matches não usa sessão: é chamada pelo cron (pg_cron) com
-// `Authorization: Bearer <service_role_key>`, validada dentro do próprio handler.
-const APIS_PUBLICAS     = ['/api/health', '/api/admin/sync-matches']
+const PAGINAS_PUBLICAS = ['/', '/login', '/auth/callback', '/auth/callback-redirect', '/regras.html']
 
-export async function proxy(request: NextRequest) {
-  let response = NextResponse.next({ request })
+// Checagem otimista de sessão: apenas detecta a PRESENÇA do cookie de auth do
+// Supabase, sem validar o JWT pela rede. O token do @supabase/ssr é gravado em
+// cookies `sb-<ref>-auth-token` (eventualmente fragmentado em `.0`, `.1`, ...).
+//
+// Por que não validar aqui: o Proxy roda no runtime Node em TODA navegação e
+// prefetch (Next 16), então um `auth.getUser()` por request era a maior fonte de
+// Active CPU/invocações na Vercel Fluid. Os docs do Next recomendam exatamente
+// uma "optimistic check" no proxy e deixar a validação forte para as rotas. Cada
+// handler de API e cada página já chamam `auth.getUser()` por conta própria, e os
+// Route Handlers persistem o token renovado nos cookies da resposta — então a
+// sessão segue sendo refrescada normalmente pelo tráfego de API do app.
+function temCookieDeSessao(request: NextRequest): boolean {
+  return request.cookies
+    .getAll()
+    .some((c) => c.name.startsWith('sb-') && c.name.includes('-auth-token'))
+}
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll()
-        },
-        setAll(cookiesToSet, headers) {
-          // Atualiza cookies no request para componentes server-side
-          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
-          // Recria response com request atualizado para que cookies sejam visíveis
-          response = NextResponse.next({ request })
-          // Propaga cookies para o browser via Set-Cookie.
-          // httpOnly forçado: nenhum código client-side lê a sessão (apenas o
-          // login dispara OAuth), então o token de auth — que embute o
-          // provider_token do Google — não deve ser legível por document.cookie.
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, { ...options, httpOnly: true })
-          )
-          // Aplica headers de cache-control do Supabase (previne cache CDN de respostas auth)
-          Object.entries(headers).forEach(([chave, valor]) =>
-            response.headers.set(chave, valor)
-          )
-        },
-      },
-    }
-  )
-
-  // getUser() valida o JWT com o servidor Supabase a cada requisição.
-  // Mais seguro que getSession() pois detecta tokens revogados e expirados.
-  const { data: { user }, error } = await supabase.auth.getUser()
-
-  if (error) {
-    console.warn('[middleware] Erro ao validar sessão:', error.message)
-  }
-
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
-  const ehRotaApi      = pathname.startsWith('/api/')
-  const ehApiPublica   = APIS_PUBLICAS.some((rota) => pathname === rota)
   const ehPaginaPublica = PAGINAS_PUBLICAS.some((rota) => pathname === rota)
 
-  if (!user) {
-    // For unauthenticated /join requests, preserve the original URL in a cookie
-    if (pathname === '/join') {
-      const urlOriginal = request.nextUrl.toString()
-      const urlLogin = new URL('/login', request.url)
-      response = NextResponse.redirect(urlLogin)
-      response.cookies.set('x-invite-redirect', urlOriginal, {
-        httpOnly: false,
-        maxAge: 60 * 60,
-        path: '/',
-      })
-      return response
-    }
-
-    if (ehRotaApi && !ehApiPublica) {
-      // APIs protegidas: retornar JSON 401 — nunca redirecionar para HTML
-      return Response.json(
-        {
-          status: 'error',
-          error: 'Sessão expirada ou inválida. Faça login novamente.',
-          code: 'SESSION_EXPIRED',
-          statusCode: 401,
-          timestamp: new Date().toISOString(),
-        },
-        { status: 401 }
-      )
-    }
-
-    // APIs públicas passam direto (ex: /api/health); apenas páginas redirecionam
-    if (!ehRotaApi && !ehPaginaPublica) {
-      const urlLogin = new URL('/login', request.url)
-      return NextResponse.redirect(urlLogin)
-    }
+  if (temCookieDeSessao(request)) {
+    return NextResponse.next()
   }
 
-  return response
+  // Sem sessão: /join preserva a URL original para retomar o convite pós-login.
+  if (pathname === '/join') {
+    const urlOriginal = request.nextUrl.toString()
+    const response = NextResponse.redirect(new URL('/login', request.url))
+    response.cookies.set('x-invite-redirect', urlOriginal, {
+      httpOnly: false,
+      maxAge: 60 * 60,
+      path: '/',
+    })
+    return response
+  }
+
+  // Demais páginas protegidas redirecionam para login.
+  if (!ehPaginaPublica) {
+    return NextResponse.redirect(new URL('/login', request.url))
+  }
+
+  return NextResponse.next()
 }
 
 export const config = {
-  // Executa em todas as rotas exceto assets estáticos
+  // Roda apenas em páginas. As rotas /api/* foram excluídas de propósito: cada
+  // handler autentica a própria sessão (getUser → 401) e as rotas públicas
+  // (/api/health, /api/admin/sync-matches via Bearer) se protegem sozinhas. Tirar
+  // /api/* daqui elimina uma invocação de função + um getUser por chamada de API.
+  // Assets estáticos também são excluídos.
   matcher: [
-    '/((?!_next/static|_next/image|favicon\\.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!api|_next/static|_next/image|favicon\\.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }

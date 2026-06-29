@@ -12,6 +12,7 @@ vi.mock('@supabase/supabase-js', () => ({
 
 vi.mock('next/cache', () => ({
   revalidateTag: vi.fn(),
+  unstable_cache: (fn: (...args: unknown[]) => unknown) => fn,
 }))
 
 import { POST } from '@/app/api/admin/sync-matches/route'
