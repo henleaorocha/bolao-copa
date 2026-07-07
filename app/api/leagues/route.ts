@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { revalidateTag } from 'next/cache'
 import { getSupabaseServerClient } from '@/lib/supabase/client'
 import { formatSuccess, formatError } from '@/lib/api/responses'
 import { canCreateLeague } from '@/lib/leagues/can-create-league'
+import { activeLeagueTag } from '@/lib/leagues/get-active-league'
 import type { LeagueSummary, LeagueMemberWithLeague } from '@/lib/api/types'
 
 export async function GET(request: NextRequest) {
@@ -291,6 +293,9 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       )
     }
+
+    // Nova liga vira a ativa → invalida o cache da liga do root layout.
+    revalidateTag(activeLeagueTag(user.id), { expire: 0 })
 
     const duration = Date.now() - start
     console.log(

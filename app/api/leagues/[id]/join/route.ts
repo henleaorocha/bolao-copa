@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { revalidateTag } from 'next/cache'
 import { getSupabaseServerClient } from '@/lib/supabase/client'
 import { RANKINGS_CACHE_TAG } from '@/lib/leagues/get-league-ranking'
+import { activeLeagueTag } from '@/lib/leagues/get-active-league'
 import { formatSuccess, formatError } from '@/lib/api/responses'
 import { ensureUserSynced } from '@/lib/user-sync'
 import type { LeagueSummary } from '@/lib/api/types'
@@ -133,6 +134,8 @@ export async function POST(
 
     // Novo membro entra no ranking (com 0 pts) → invalida para aparecer já.
     revalidateTag(RANKINGS_CACHE_TAG, { expire: 0 })
+    // Liga ativa do usuário mudou → invalida o cache da liga do root layout.
+    revalidateTag(activeLeagueTag(user.id), { expire: 0 })
 
     // Fetch updated league data for response (exclude invite_token)
     const leagueSummaryResult = await supabase

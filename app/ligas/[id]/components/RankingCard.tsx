@@ -73,6 +73,7 @@ export default function RankingCard({ ranking, currentUserId, leagueId }: Rankin
       </div>
       <div className="px-4 py-3 border-t border-slate-100 text-right">
         <Link
+          prefetch={false}
           href={`/ligas/${leagueId}/ranking`}
           className="text-sm font-semibold text-yellow-600 hover:text-yellow-700 transition-colors"
         >

@@ -4,6 +4,7 @@ import "./globals.css";
 import { LeagueProvider } from "@/lib/league-context";
 import { LayoutWrapper } from "@/components/topbar/LayoutWrapper";
 import { getSupabaseServerClient } from "@/lib/supabase/client";
+import { getCachedActiveLeague } from "@/lib/leagues/get-active-league";
 import type { LeagueSummary } from "@/lib/api/types";
 
 const geistSans = Geist({
@@ -16,6 +17,10 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+// O root layout lê cookies (auth) em toda rota via getActiveLeague, então todas
+// as páginas são dinâmicas de qualquer forma. Manter force-dynamic evita o Next
+// tentar (e falhar) pré-renderizar estaticamente no build. O custo por request
+// não vem daqui, e sim das queries — agora cacheadas em getCachedActiveLeague.
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
@@ -25,6 +30,10 @@ export const metadata: Metadata = {
 
 async function getActiveLeague(): Promise<LeagueSummary | null> {
   try {
+    // Só o getUser roda por request (valida o cookie de sessão e nos dá o id).
+    // As queries de liga/membership são cacheadas por userId em
+    // getCachedActiveLeague — antes eram até 4 queries por navegação/prefetch,
+    // a maior fonte de Active CPU restante na Vercel Fluid.
     const supabase = await getSupabaseServerClient();
     const {
       data: { user },
@@ -34,74 +43,7 @@ async function getActiveLeague(): Promise<LeagueSummary | null> {
       return null;
     }
 
-    const userResult = await supabase
-      .from("users")
-      .select("id, email, full_name, avatar_url, avatar_color, created_at, active_league_id")
-      .eq("id", user.id)
-      .single();
-
-    if (userResult.error) {
-      console.error("[layout] Error fetching user:", userResult.error.message);
-      return null;
-    }
-
-    const userData = userResult.data;
-    let effectiveLeagueId: string | null = null;
-
-    if (userData.active_league_id) {
-      const membershipCheck = await supabase
-        .from("league_members")
-        .select("user_id")
-        .eq("user_id", user.id)
-        .eq("league_id", userData.active_league_id)
-        .single();
-
-      if (!membershipCheck.error) {
-        effectiveLeagueId = userData.active_league_id;
-      }
-    }
-
-    if (!effectiveLeagueId) {
-      const fallbackResult = await supabase
-        .from("league_members")
-        .select("league_id")
-        .eq("user_id", user.id)
-        .order("joined_at", { ascending: true })
-        .limit(1)
-        .single();
-
-      if (fallbackResult.error) {
-        console.error("[layout] Error fetching fallback league:", fallbackResult.error.message);
-        return null;
-      }
-
-      effectiveLeagueId = fallbackResult.data.league_id;
-    }
-
-    const [leagueResult, memberResult] = await Promise.all([
-      supabase
-        .from("leagues")
-        .select("id, name, access_type, logo_url, member_count")
-        .eq("id", effectiveLeagueId)
-        .single(),
-      supabase
-        .from("league_members")
-        .select("role")
-        .eq("user_id", user.id)
-        .eq("league_id", effectiveLeagueId)
-        .single(),
-    ]);
-
-    if (leagueResult.error || memberResult.error) {
-      const err = leagueResult.error ?? memberResult.error;
-      console.error("[layout] Database error:", err?.message);
-      return null;
-    }
-
-    return {
-      ...leagueResult.data,
-      role: memberResult.data.role,
-    };
+    return await getCachedActiveLeague(user.id);
   } catch (err) {
     console.error("[layout] Error in getActiveLeague:", err instanceof Error ? err.message : "unknown");
     return null;

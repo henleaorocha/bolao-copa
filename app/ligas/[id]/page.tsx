@@ -44,6 +44,7 @@ export default function LeagueDetailPage() {
             <p className="text-sm text-slate-600 mt-1">{league.name}</p>
           </div>
           <Link
+            prefetch={false}
             href="/ligas"
             className="flex items-center gap-1 text-sm font-semibold text-slate-500 hover:text-slate-700 transition-colors shrink-0 mt-1"
           >

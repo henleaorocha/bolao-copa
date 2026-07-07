@@ -161,6 +161,7 @@ export default function MatchRow({
               Placar exato: +10 pts · Vencedor/empate: +5 pts
             </span>
             <Link
+              prefetch={false}
               href={`/ligas/${leagueId}/palpites/${match.id}`}
               className="text-[10px] font-bold text-[#0097A9] hover:underline shrink-0 ml-2"
             >
@@ -182,6 +183,7 @@ export default function MatchRow({
       {isFinished && (
         <div className="hidden lg:flex items-center justify-end px-4 pb-3">
           <Link
+            prefetch={false}
             href={`/ligas/${leagueId}/palpites/${match.id}`}
             className="text-[10px] font-bold text-[#0097A9] hover:underline"
             data-testid="details-link-finished-lg"
@@ -200,6 +202,7 @@ export default function MatchRow({
           +10 pts exato · +5 pts vencedor
         </span>
         <Link
+          prefetch={false}
           href={`/ligas/${leagueId}/palpites/${match.id}`}
           className="text-[10px] font-bold text-[#0097A9] hover:underline shrink-0"
           data-testid="details-link"

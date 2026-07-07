@@ -27,6 +27,7 @@ function Shell({ children }: { children: ReactNode }) {
         <div className="text-center max-w-sm">
           <p className="text-red-600 font-semibold mb-4">{error || 'Liga não encontrada'}</p>
           <Link
+            prefetch={false}
             href="/ligas"
             className="px-6 py-3 bg-yellow-400 rounded-xl font-semibold text-slate-900 hover:bg-yellow-500"
           >

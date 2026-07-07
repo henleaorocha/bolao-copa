@@ -155,6 +155,7 @@ export default function MatchCard({ slot, leagueId, homeInput, awayInput, onInpu
           )}
           {hasDetailsLink && (
             <Link
+              prefetch={false}
               href={`/ligas/${leagueId}/palpites/${slot.matchId}`}
               className="text-[10px] font-bold text-[#0097A9] hover:underline shrink-0"
               data-testid="details-link"

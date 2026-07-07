@@ -76,7 +76,7 @@ export default function PainelSidebar({
           ].join(' ')
 
           return (
-            <Link key={label} href={href} className={classes}>
+            <Link key={label} href={href} prefetch={false} className={classes}>
               <Icon size={18} strokeWidth={active ? 2.5 : 1.8} className="shrink-0" />
               <span className="flex-1">{label}</span>
               {(active || showDot) && (

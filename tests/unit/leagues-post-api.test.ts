@@ -4,6 +4,11 @@ import { NextRequest } from 'next/server'
 vi.mock('@/lib/supabase/client', () => ({
   getSupabaseServerClient: vi.fn(),
 }))
+// A rota invalida o cache da liga ativa (revalidateTag) ao criar uma liga.
+vi.mock('next/cache', () => ({
+  unstable_cache: (fn: (...args: unknown[]) => unknown) => fn,
+  revalidateTag: vi.fn(),
+}))
 
 import { POST } from '@/app/api/leagues/route'
 import { getSupabaseServerClient } from '@/lib/supabase/client'

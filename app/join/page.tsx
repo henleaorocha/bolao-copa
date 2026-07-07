@@ -23,6 +23,7 @@ export default async function JoinPage({ searchParams }: JoinPageProps) {
             O link que você está usando não é válido ou expirou. Tente solicitar um novo convite do administrador da liga.
           </p>
           <Link
+            prefetch={false}
             href="/ligas"
             className="block rounded-lg bg-blue-600 px-4 py-2 text-center text-sm font-semibold text-white hover:bg-blue-700"
           >
@@ -67,6 +68,7 @@ export default async function JoinPage({ searchParams }: JoinPageProps) {
             Não conseguimos encontrar a liga associada a este link. Verifique se o link está correto e tente novamente.
           </p>
           <Link
+            prefetch={false}
             href="/ligas"
             className="block rounded-lg bg-blue-600 px-4 py-2 text-center text-sm font-semibold text-white hover:bg-blue-700"
           >

@@ -21,6 +21,11 @@ vi.mock('@/lib/user-sync', () => ({
 vi.mock('@/lib/resolve-active-league', () => ({
   resolveActiveLeague: vi.fn(),
 }))
+// O PATCH invalida o cache da liga ativa (revalidateTag) ao trocar de liga.
+vi.mock('next/cache', () => ({
+  unstable_cache: (fn: (...args: unknown[]) => unknown) => fn,
+  revalidateTag: vi.fn(),
+}))
 
 import { GET, PATCH } from '@/app/api/auth/me/route'
 import { getSupabaseServerClient } from '@/lib/supabase/client'

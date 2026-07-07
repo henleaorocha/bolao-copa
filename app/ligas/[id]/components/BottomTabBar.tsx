@@ -56,7 +56,7 @@ export default function BottomTabBar({ leagueId, mataMataUnlock = false }: Botto
 
         if (href) {
           return (
-            <Link key={label} href={href} role="tab" aria-selected={active} className={classes}>
+            <Link key={label} href={href} prefetch={false} role="tab" aria-selected={active} className={classes}>
               {iconEl}
               {label}
             </Link>

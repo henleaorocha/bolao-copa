@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { revalidateTag } from 'next/cache'
 import { getSupabaseServerClient } from '@/lib/supabase/client'
 import { formatSuccess, formatError } from '@/lib/api/responses'
 import { ensureUserSynced } from '@/lib/user-sync'
 import { resolveActiveLeague } from '@/lib/resolve-active-league'
+import { activeLeagueTag } from '@/lib/leagues/get-active-league'
 
 export async function GET(request: NextRequest) {
   const start = Date.now()
@@ -220,6 +222,9 @@ export async function PATCH(request: NextRequest) {
         { status: 500 }
       )
     }
+
+    // Liga ativa mudou → invalida o cache da liga do root layout.
+    revalidateTag(activeLeagueTag(user.id), { expire: 0 })
 
     // Fetch league and membership details
     const [leagueResult, memberResult] = await Promise.all([

@@ -21,7 +21,7 @@ export default function PainelTopBar({
 
   return (
     <header className="flex lg:hidden items-center justify-between px-4 py-3 bg-[#244C5A] text-white sticky top-0 z-30">
-      <Link href="/ligas" className="flex items-center gap-3 min-w-0 flex-1 min-h-[44px]">
+      <Link href="/ligas" prefetch={false} className="flex items-center gap-3 min-w-0 flex-1 min-h-[44px]">
         {leagueLogoUrl ? (
           <div className="w-8 h-8 rounded-lg overflow-hidden flex-shrink-0">
             <Image src={leagueLogoUrl} alt={leagueName} width={32} height={32} className="object-cover w-full h-full" />

@@ -95,6 +95,7 @@ export default function UpcomingMatchesCard({ leagueId }: UpcomingMatchesCardPro
           </div>
         </div>
         <Link
+          prefetch={false}
           href={`/ligas/${leagueId}/mata-mata`}
           className="text-xs font-bold text-[#0097A9] hover:underline shrink-0"
         >
@@ -132,6 +133,7 @@ export default function UpcomingMatchesCard({ leagueId }: UpcomingMatchesCardPro
           {matches.map((match) => (
             <Link
               key={match.id}
+              prefetch={false}
               href={`/ligas/${leagueId}/palpites/${match.id}`}
               className="flex items-center gap-3 p-3 rounded-2xl bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer"
               data-testid="match-card"
