@@ -30,7 +30,7 @@ export default async function ControleResultadosPage() {
   const { data, error } = await supabase
     .from('matches')
     .select(
-      'id, home_team, away_team, match_date, phase, status, home_score, away_score, is_manual, manual_updated_at'
+      'id, home_team, away_team, match_date, phase, status, home_score, away_score, is_manual, manual_updated_at, winner_team'
     )
     .order('match_date', { ascending: true })
 
@@ -52,7 +52,10 @@ export default async function ControleResultadosPage() {
           </h1>
           <p className="mt-1 text-sm text-slate-500">
             Salvar marca a partida como manual (protegida do sync automático).
-            Liberar devolve ao controle automático.
+            Liberar devolve ao controle automático. Em jogos de mata-mata
+            decididos nos pênaltis, informe o <strong>Vencedor</strong> — o placar
+            continua o do tempo normal/prorrogação (ex.: 1×1) e o campeão/vice é
+            apurado pelo vencedor.
           </p>
         </header>
 

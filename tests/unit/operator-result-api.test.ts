@@ -150,6 +150,56 @@ describe('PATCH /api/admin/matches/[id]/result', () => {
     expect(update.status).toBe('finished')
     expect(update.is_manual).toBe(true)
     expect(typeof update.manual_updated_at).toBe('string')
+    expect(update.winner_team).toBe(null)
+  })
+
+  it('stores winner_team on a penalty-decided draw when it matches a match team', async () => {
+    const { from, updateSpy } = makeServiceClient({
+      matchResult: {
+        data: { id: MATCH_ID, home_team: 'Brasil', away_team: 'Argentina' },
+        error: null,
+      },
+    })
+    vi.mocked(createClient).mockReturnValue({ from } as never)
+
+    const res = await PATCH(
+      makeRequest({
+        home_score: 1,
+        away_score: 1,
+        status: 'finished',
+        winner_team: 'Argentina',
+      }),
+      makeParams()
+    )
+
+    expect(res.status).toBe(200)
+    const update = updateSpy.mock.calls[0][0] as Record<string, unknown>
+    expect(update.winner_team).toBe('Argentina')
+    expect(update.home_score).toBe(1)
+    expect(update.away_score).toBe(1)
+  })
+
+  it('rejects a winner_team that is not one of the two match teams', async () => {
+    const { from } = makeServiceClient({
+      matchResult: {
+        data: { id: MATCH_ID, home_team: 'Brasil', away_team: 'Argentina' },
+        error: null,
+      },
+    })
+    vi.mocked(createClient).mockReturnValue({ from } as never)
+
+    const res = await PATCH(
+      makeRequest({
+        home_score: 1,
+        away_score: 1,
+        status: 'finished',
+        winner_team: 'França',
+      }),
+      makeParams()
+    )
+
+    expect(res.status).toBe(400)
+    expect((await res.json()).code).toBe('INVALID_BODY')
   })
 
   it('accepts a score exactly at the upper bound (99)', async () => {
@@ -164,7 +214,7 @@ describe('PATCH /api/admin/matches/[id]/result', () => {
 
   // ─── Release path ──────────────────────────────────────────────────────
 
-  it('sets is_manual=false on release: true', async () => {
+  it('sets is_manual=false and clears winner_team on release: true', async () => {
     const { from, updateSpy } = makeServiceClient({
       updateResult: { data: { ...UPDATED_ROW, is_manual: false }, error: null },
     })
@@ -174,7 +224,7 @@ describe('PATCH /api/admin/matches/[id]/result', () => {
 
     expect(res.status).toBe(200)
     const update = updateSpy.mock.calls[0][0] as Record<string, unknown>
-    expect(update).toEqual({ is_manual: false })
+    expect(update).toEqual({ is_manual: false, winner_team: null })
   })
 
   // ─── Body validation (set path) ──────────────────────────────────────────

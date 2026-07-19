@@ -59,11 +59,13 @@ export async function PATCH(
       )
     }
 
-    const { home_score, away_score, status, release } = (body ?? {}) as {
+    const { home_score, away_score, status, release, winner_team } = (body ??
+      {}) as {
       home_score?: unknown
       away_score?: unknown
       status?: unknown
       release?: unknown
+      winner_team?: unknown
     }
 
     const isRelease = release === true
@@ -94,10 +96,11 @@ export async function PATCH(
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     )
 
-    // Guard 4: match existence
+    // Guard 4: match existence (also needs the two team names to validate
+    // winner_team, which must be exactly one of them).
     const matchResult = await supabase
       .from('matches')
-      .select('id')
+      .select('id, home_team, away_team')
       .eq('id', matchId)
       .single()
 
@@ -108,14 +111,37 @@ export async function PATCH(
       )
     }
 
-    // release: return the match to automatic control (ADR-004).
-    // otherwise: set scores/status and lock the match from automatic overwrite.
+    // Guard 5: winner_team (set path only, optional). Registra quem venceu nos
+    // pênaltis num mata-mata empatado. Ausente/null → sem vencedor definido;
+    // quando presente, precisa ser exatamente um dos dois times da partida.
+    let winnerTeamValue: string | null = null
+    if (!isRelease && winner_team != null && winner_team !== '') {
+      if (
+        typeof winner_team !== 'string' ||
+        (winner_team !== matchResult.data.home_team &&
+          winner_team !== matchResult.data.away_team)
+      ) {
+        return NextResponse.json(
+          formatError(
+            'INVALID_BODY',
+            'winner_team deve ser um dos dois times da partida',
+            400
+          ),
+          { status: 400 }
+        )
+      }
+      winnerTeamValue = winner_team
+    }
+
+    // release: return the match to automatic control (ADR-004) e limpa o vencedor
+    // manual. otherwise: set scores/status/winner e trava contra o sync automático.
     const update = isRelease
-      ? { is_manual: false }
+      ? { is_manual: false, winner_team: null }
       : {
           home_score: home_score as number,
           away_score: away_score as number,
           status: status as string,
+          winner_team: winnerTeamValue,
           is_manual: true,
           manual_updated_at: new Date().toISOString(),
         }

@@ -99,6 +99,53 @@ describe('computeRanking', () => {
       expect(entry.exact_scores).toBe(0)
       expect(entry.correct_outcomes).toBe(0)
     })
+
+    it('drawn final decided on penalties: winner_team resolves champion/vice bonus', () => {
+      const member = makeMember()
+      const finalMatch = makeMatch({
+        id: 'final',
+        phase: 'final',
+        home_score: 1,
+        away_score: 1,
+        home_team: 'BRA',
+        away_team: 'ARG',
+        winner_team: 'ARG', // venceu nos pênaltis; placar segue 1×1
+        match_date: '2026-07-13T20:00:00Z',
+      })
+      const champBet = { user_id: 'user-1', champion_team: 'ARG', runner_up_team: 'BRA' }
+      const [entry] = computeRanking(
+        args({
+          members: [member],
+          predictions: [],
+          finishedMatches: [finalMatch],
+          championBets: [champBet],
+        })
+      )
+      expect(entry.points).toBe(75) // campeão ARG + vice BRA
+    })
+
+    it('drawn final with no winner_team: champion bonus stays unawarded', () => {
+      const member = makeMember()
+      const finalMatch = makeMatch({
+        id: 'final',
+        phase: 'final',
+        home_score: 1,
+        away_score: 1,
+        home_team: 'BRA',
+        away_team: 'ARG',
+        match_date: '2026-07-13T20:00:00Z',
+      })
+      const champBet = { user_id: 'user-1', champion_team: 'BRA', runner_up_team: 'ARG' }
+      const [entry] = computeRanking(
+        args({
+          members: [member],
+          predictions: [],
+          finishedMatches: [finalMatch],
+          championBets: [champBet],
+        })
+      )
+      expect(entry.points).toBe(0) // sem vencedor definido, campeão/vice ficam nulos
+    })
   })
 
   describe('correct_outcomes includes exact scores', () => {

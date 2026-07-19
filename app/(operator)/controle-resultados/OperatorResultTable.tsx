@@ -13,6 +13,7 @@ export interface OperatorMatch {
   away_score: number | null
   is_manual: boolean
   manual_updated_at: string | null
+  winner_team: string | null
 }
 
 const STATUSES: OperatorMatch['status'][] = ['scheduled', 'live', 'finished']
@@ -21,7 +22,9 @@ function MatchRow({ match }: { match: OperatorMatch }) {
   const [home, setHome] = useState(match.home_score?.toString() ?? '')
   const [away, setAway] = useState(match.away_score?.toString() ?? '')
   const [status, setStatus] = useState<OperatorMatch['status']>(match.status)
+  const [winner, setWinner] = useState(match.winner_team ?? '')
   const [isManual, setIsManual] = useState(match.is_manual)
+  const isKnockout = match.phase !== 'group'
   const [busy, setBusy] = useState(false)
   const [feedback, setFeedback] = useState<string | null>(null)
 
@@ -54,6 +57,7 @@ function MatchRow({ match }: { match: OperatorMatch }) {
         home_score: Number(home),
         away_score: Number(away),
         status,
+        winner_team: isKnockout && winner ? winner : null,
       },
       'Resultado salvo (manual)'
     )
@@ -116,6 +120,22 @@ function MatchRow({ match }: { match: OperatorMatch }) {
         </select>
       </td>
       <td className="px-3 py-2">
+        {isKnockout ? (
+          <select
+            aria-label="Vencedor (pênaltis)"
+            value={winner}
+            onChange={(e) => setWinner(e.target.value)}
+            className="rounded border border-slate-300 px-2 py-1 text-sm"
+          >
+            <option value="">—</option>
+            <option value={match.home_team}>{match.home_team}</option>
+            <option value={match.away_team}>{match.away_team}</option>
+          </select>
+        ) : (
+          <span className="text-xs text-slate-300">—</span>
+        )}
+      </td>
+      <td className="px-3 py-2">
         <button
           onClick={handleSave}
           disabled={busy}
@@ -157,6 +177,7 @@ export default function OperatorResultTable({
           <th className="px-3 py-2">Mandante</th>
           <th className="px-3 py-2">Visitante</th>
           <th className="px-3 py-2">Status</th>
+          <th className="px-3 py-2">Vencedor</th>
           <th className="px-3 py-2">Ações</th>
         </tr>
       </thead>

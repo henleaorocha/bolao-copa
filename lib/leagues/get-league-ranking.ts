@@ -75,7 +75,7 @@ async function computeLeagueRankingUncached(
       supabase
         .from('matches')
         .select(
-          'id, phase, home_team, away_team, home_score, away_score, match_date'
+          'id, phase, home_team, away_team, home_score, away_score, match_date, winner_team'
         )
         .eq('status', 'finished'),
     ])

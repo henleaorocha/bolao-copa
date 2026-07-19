@@ -19,6 +19,7 @@ export interface RankingMatchInput {
   match_date: string
   home_team?: string
   away_team?: string
+  winner_team?: string | null
 }
 
 export interface RankingComputeArgs {
@@ -63,6 +64,16 @@ export function computeRanking(args: RankingComputeArgs): RankingFullEntry[] {
         realChamp = m.home_team
         realVice = m.away_team
       } else if (m.away_score > m.home_score) {
+        realChamp = m.away_team
+        realVice = m.home_team
+      } else if (m.winner_team === m.home_team) {
+        // Empate no placar (final decidida nos pênaltis): o vencedor é registrado
+        // em winner_team pelo controle manual (o placar continua o do tempo
+        // normal/prorrogação, sem distorção). Sem winner_team, campeão/vice ficam
+        // nulos e o bônus de 50/25 não é distribuído.
+        realChamp = m.home_team
+        realVice = m.away_team
+      } else if (m.winner_team === m.away_team) {
         realChamp = m.away_team
         realVice = m.home_team
       }
