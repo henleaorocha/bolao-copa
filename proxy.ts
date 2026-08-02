@@ -6,6 +6,19 @@ import type { NextRequest } from 'next/server'
 // e ser compartilhado por link (ex: WhatsApp) sem exigir login.
 const PAGINAS_PUBLICAS = ['/', '/login', '/auth/callback', '/auth/callback-redirect', '/regras.html']
 
+// Prefixos públicos por definição: o discovery do OAuth (RFCs 8414/9728) é
+// anônimo — o cliente MCP precisa ler estes documentos ANTES de ter qualquer
+// token. Como os caminhos ficam fora de /api, eles caem no matcher do proxy e
+// precisam ser liberados aqui explicitamente (o rewrite para /api/oauth/... em
+// next.config.ts só acontece depois que o proxy deixa a requisição passar).
+const PREFIXOS_PUBLICOS = ['/.well-known/']
+
+// Páginas que, sem sessão, mandam para o login preservando a URL de origem em vez
+// de descartá-la. Vale para o convite de liga (/join) e para a tela de
+// consentimento do connector (/oauth/authorize): em ambos, perder os parâmetros
+// da URL quebra o fluxo — no OAuth, cairíamos de volta sem client_id nem PKCE.
+const ROTAS_COM_RETORNO = ['/join', '/oauth/authorize']
+
 // Checagem otimista de sessão: apenas detecta a PRESENÇA do cookie de auth do
 // Supabase, sem validar o JWT pela rede. O token do @supabase/ssr é gravado em
 // cookies `sb-<ref>-auth-token` (eventualmente fragmentado em `.0`, `.1`, ...).
@@ -25,14 +38,16 @@ function temCookieDeSessao(request: NextRequest): boolean {
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
-  const ehPaginaPublica = PAGINAS_PUBLICAS.some((rota) => pathname === rota)
+  const ehPaginaPublica =
+    PAGINAS_PUBLICAS.some((rota) => pathname === rota) ||
+    PREFIXOS_PUBLICOS.some((prefixo) => pathname.startsWith(prefixo))
 
   if (temCookieDeSessao(request)) {
     return NextResponse.next()
   }
 
-  // Sem sessão: /join preserva a URL original para retomar o convite pós-login.
-  if (pathname === '/join') {
+  // Sem sessão: preserva a URL original para retomar o fluxo depois do login.
+  if (ROTAS_COM_RETORNO.includes(pathname)) {
     const urlOriginal = request.nextUrl.toString()
     const response = NextResponse.redirect(new URL('/login', request.url))
     response.cookies.set('x-invite-redirect', urlOriginal, {
